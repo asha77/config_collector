@@ -1,0 +1,84 @@
+show running-config
+show version
+show inventory
+show module
+show interfaces status
+show interfaces description
+show interfaces switchport
+show interfaces trunk
+show mac address-table
+show ip arp
+show vrrp
+show hsrp
+show ip interface brief
+show cdp neighbors
+show cdp neighbors detail
+show lldp neighbors
+show ip dhcp snooping binding
+show logging
+show spanning-tree
+show spanning-tree bridge
+show spanning-tree active
+show switch detail
+show env all
+show etherchannel summary
+show port-channel summary
+show interfaces transceiver
+show vlan
+show vtp status
+show protocols
+show ip protocols
+show ip route
+show ip route summary
+show ip ospf
+show ip ospf neighbor
+show ip ospf interface brief
+show ip ospf border-routers
+show ip ospf database router self-originate
+show ip ospf database external self-originate
+show ip bgp summary
+show ip bgp vpnv4 all summary
+show ntp status
+show ntp associations
+show ntp peer-status
+show processes cpu sorted
+show processes memory sorted
+show dot1x all
+show etherchannel protocol
+show ip arp
+show ip arp inspection
+show ip arp inspection interfaces
+show ip bgp
+show ip bgp community
+show ip bgp vpnv4 all
+show ip bgp vpnv4 all community
+show ip bgp vpnv4 all neighbors
+show ip dhcp snooping
+show ip ospf
+show ip ospf database
+show ip ospf database network
+show ip ospf interface brief
+show ip protocols summary
+show ip rip database
+show ip vrf
+show ip vrf interfaces
+show l2tun
+show lldp neighbors detail
+show mpls ldp discovery
+show mpls ldp neighbor
+show port-security
+show radius server-group all
+show spanning-tree summary
+show standby
+show standby brief
+show tacacs
+show vlan brief
+show vlan internal usage
+show vlan private-vlan
+show vlan-switch
+show power inline
+show ip route vrf *
+show mpls interfaces detail
+show mpls forwarding
+show vpc
+show vpc consistency-parameters global
