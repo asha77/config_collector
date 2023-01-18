@@ -4,6 +4,8 @@ from decouple import config
 import argparse
 from datetime import datetime
 import os
+from scrapli.driver import GenericDriver
+import re
 
 AUTH_USERNAME = config('AUTH_USERNAME')
 AUTH_PASSWORD = config('AUTH_PASSWORD')
@@ -40,6 +42,81 @@ def createparser():
     return parser
 
 
+def obtain_model(config):
+    '''
+    Extract model number
+    '''
+    match = re.search("Model \wumber\ *: (.*)", config)
+    if match:
+        return match.group(1).strip()
+    else:
+        match = re.search("\wisco (\S+) .* (with)*\d+K\/\d+K bytes of memory.", config)
+        if match:
+            return match.group(1).strip()
+        else:
+            match = re.search("\ \ cisco Nexus9000 (.*) Chassis", config)
+            if match:
+                return "N9K-"+match.group(1).strip()
+            else:
+                match = re.search("Arista vEOS", config)
+                if match:
+                    return "Arista vEOS"
+                else:
+                    return "Not Found"
+
+
+def obtain_software_version(config):
+    '''
+    Extract software version
+    '''
+
+    family = obtain_software_family(config)
+
+    if family == "IOS XE":
+        match = re.search("Cisco .+ Version ([0-9.()A-Za-z]+)", config)
+        if match:
+            return match.group(1).strip()
+    elif family == "IOS":
+        match = re.search("Cisco .+ Version ([0-9.()A-Za-z]+)", config)
+        if match:
+            return match.group(1).strip()
+    elif family == "NX-OS":
+        match = re.search("\ *NXOS: version (.*)", config)
+        if match:
+            return match.group(1).strip()
+    elif family == "Arista":
+        match = re.search("Software image version: (.*)", config)
+        if match:
+            return match.group(1).strip()
+    else:
+        return "Not Found"
+
+
+
+def obtain_software_family(config):
+    '''
+    Extract software family
+    '''
+
+    match = re.search("Cisco IOS XE Software", config)
+    if match:
+        return "IOS XE"
+    else:
+        match = re.search("Cisco Nexus Operating System", config)
+        if match:
+            return "NX-OS"
+        else:
+            match = re.search("Cisco IOS Software,", config)
+            if match:
+                return "IOS"
+            else:
+                match = re.search("Arista", config)
+                if match:
+                    return "Arista"
+                else:
+                    return "Not Found"
+
+
 def get_devices_from_file(file):
     devices = []
     with open(file) as f:
@@ -60,6 +137,13 @@ def get_devices_from_file(file):
                 ena_pass = AUTH_SECONDARY
             else:
                 ena_pass = str[4]
+
+            showver = get_congig(str[1], uname, passw)
+
+            model = obtain_model(showver)
+            soft_ver = obtain_software_version(showver)
+
+            sendlog(curr_path, "Device model is: " + model + ". Software version is: " + soft_ver)
 
             dev = {
                 'platform': str[0],
@@ -91,8 +175,22 @@ def send_show(device, show_command):
             return reply.result
     except ScrapliException as error:
         print(error)
-#        sendlog(cnf_save_path, str(error) + " " + device["host"])
 
+
+def get_congig(ip, login, passw):
+    my_device = {
+        "host": ip,
+        "auth_username": login,
+        "auth_password": passw,
+        "auth_strict_key": False,
+        "transport": "ssh2"
+    }
+
+    with GenericDriver(**my_device) as conn:
+        conn.send_command("terminal length 0")
+        response = conn.send_command("show version")
+#        responses = conn.send_commands(["show version", "show run"])
+    return response.result
 
 def start():
     parser = createparser()
@@ -144,11 +242,21 @@ def start():
     # connect to devices
     for device in devices:
         devStartTime = datetime.now()
-        for command in commands:
-            res = send_show(device, command)
-            saveoutfile(cnf_save_path, device['host'], "\n" + "# " + command + res+"\n")
+        sendlog(curr_path, "Starting processing of device {}".format(device['host']))
+        try:
+            with Scrapli(**device) as ssh:
+#                ssh.open()
+                for command in commands:
+                    reply = ssh.send_command(command)
+                    saveoutfile(cnf_save_path, device['host'], "\n" + "# " + command +"\n" + reply.result + "\n")
+        except ScrapliException as error:
+            print(error)
 
         sendlog(curr_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
+
+            #        sendlog(cnf_save_path, str(error) + " " + device["host"])
+#            res = send_show(device, command)
+
 
 
 if __name__ == '__main__':

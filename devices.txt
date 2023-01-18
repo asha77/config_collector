@@ -1,1 +1,5 @@
 cisco_iosxe;10.31.70.209;mk;q1q1q1;
+cisco_iosxe;10.31.75.231;admin;admin;
+cisco_iosxe;10.31.75.232;admin;admin;
+arista_eos;10.31.75.229;admin;admin;
+arista_eos;10.31.75.230;admin;admin;
