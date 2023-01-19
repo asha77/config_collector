@@ -1,16 +1,18 @@
 from scrapli import Scrapli
-from scrapli.exceptions import ScrapliException
+from scrapli.exceptions import ScrapliException, ScrapliAuthenticationFailed
 from decouple import config
 import argparse
 from datetime import datetime
 import os
 from scrapli.driver import GenericDriver
 import re
+import logging
+
 
 AUTH_USERNAME = config('AUTH_USERNAME')
 AUTH_PASSWORD = config('AUTH_PASSWORD')
 AUTH_SECONDARY = config('AUTH_SECONDARY')
-if (config('AUTH_STRICT_KEY') == "True"):
+if config('AUTH_STRICT_KEY') == "True":
     AUTH_STRICT_KEY = True
 else:
     AUTH_STRICT_KEY = False
@@ -20,12 +22,24 @@ TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
 
 
+family_to_platform = {
+    'IOS': 10**-3,
+    'IOS XE': 'cisco_iosxe',
+    'Nexus': 'cisco_nxos',
+    'IOS XR': 'cisco_iosxr',
+    'JUNOS': 'juniper_junos',
+    'EOS': 'arista_eos'
+}
+
+logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
+
+
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
     resfile = open(file_name, "a")
-    resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " devbot  INFO: "+ message + "\n")
+    resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " devbot  INFO: " + message + "\n")
     resfile.close()
-    print(str(datetime.now()) + " devbot INFO: "+ message)
+    print(str(datetime.now()) + " devbot INFO: " + message)
 
 
 def saveoutfile(path, ip, message):
@@ -92,7 +106,6 @@ def obtain_software_version(config):
         return "Not Found"
 
 
-
 def obtain_software_family(config):
     '''
     Extract software family
@@ -112,9 +125,37 @@ def obtain_software_family(config):
             else:
                 match = re.search("Arista", config)
                 if match:
-                    return "Arista"
+                    return "EOS"
                 else:
                     return "Not Found"
+
+
+def obtain_hostname(config):
+    '''
+    Extract device hostname
+    '''
+
+    match = re.search("hostname (.*)", config)
+    if match:
+        return match.group(1).strip()
+    else:
+        return "Not Found"
+
+
+
+def assign_platform(dev_family):
+    '''
+    Assign device platform based on device family
+    '''
+
+    try:
+        platform = family_to_platform[dev_family]
+    except KeyError as error:
+        # можно также присвоить значение по умолчанию вместо бросания исключения
+        sendlog(curr_path, "No suitable platform for device family {}".format(dev_family))
+#        raise ValueError('Undefined unit: {}'.format(e.args[0]))
+        platform = ""
+    return platform
 
 
 def get_devices_from_file(file):
@@ -138,15 +179,25 @@ def get_devices_from_file(file):
             else:
                 ena_pass = str[4]
 
-            showver = get_congig(str[1], uname, passw)
+            showver = get_show_version(str[1], uname, passw)
+            device_model = obtain_model(showver)
+            device_soft_ver = obtain_software_version(showver)
+            device_family = obtain_software_family(showver)
+            device_platform = assign_platform(device_family)
 
-            model = obtain_model(showver)
-            soft_ver = obtain_software_version(showver)
-
-            sendlog(curr_path, "Device model is: " + model + ". Software version is: " + soft_ver)
+            if device_platform:
+                sendlog(cnf_save_path, "IP: " + str[1] + ". Device model is: " + device_model + ". Software version is: " + device_soft_ver + ". Selected platform: " + device_platform)
+            else:
+                if str[0]:
+                    device_platform == str[0]
+                else:
+                    sendlog(cnf_save_path, "IP: " + str[1] + " Device and platform not recognized.")
+                    if showver:
+                        saveoutfile(cnf_save_path, str[1], "\n" + showver)
+                    continue
 
             dev = {
-                'platform': str[0],
+                'platform': device_platform,
                 'host': str[1],
                 'auth_username': uname,
                 'auth_password': passw,
@@ -167,7 +218,7 @@ def get_commands_from_file(file):
             commands.append(line)
     return(commands)
 
-
+'''
 def send_show(device, show_command):
     try:
         with Scrapli(**device) as ssh:
@@ -175,9 +226,9 @@ def send_show(device, show_command):
             return reply.result
     except ScrapliException as error:
         print(error)
+'''
 
-
-def get_congig(ip, login, passw):
+def get_show_version(ip, login, passw):
     my_device = {
         "host": ip,
         "auth_username": login,
@@ -186,11 +237,18 @@ def get_congig(ip, login, passw):
         "transport": "ssh2"
     }
 
-    with GenericDriver(**my_device) as conn:
-        conn.send_command("terminal length 0")
-        response = conn.send_command("show version")
-#        responses = conn.send_commands(["show version", "show run"])
+    try:
+        with GenericDriver(**my_device) as conn:
+                conn.send_command("terminal length 0")
+                response = conn.send_command("show version")
+    except ScrapliAuthenticationFailed as error:
+        sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
+        return ""
+    except ScrapliException as error:
+        sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
+        return ""
     return response.result
+
 
 def start():
     parser = createparser()
@@ -215,10 +273,7 @@ def start():
     else:
         curr_path = WORKING_DIRECTORY
 
-    sendlog(curr_path, "Starting at "+date)
-
     os.chdir(curr_path)
-
     if not os.path.isdir("output"):
         os.mkdir("output")
 
@@ -228,16 +283,15 @@ def start():
     cnf_save_path = os.path.join(cnf_save_path,"cnf_"+date)
     os.chdir(cnf_save_path)
 
-    sendlog(curr_path, "Config save folder is is: " + str(cnf_save_path))
+    sendlog(cnf_save_path, "Starting at "+date)
+    sendlog(cnf_save_path, "Config save folder is is: " + str(cnf_save_path))
 
     # Get list of available device files
     devices = get_devices_from_file(os.path.join(curr_path, namespace.devfile))
-
     # Get list of available device files
     commands = get_commands_from_file(os.path.join(curr_path, namespace.comfiles))
-
-    sendlog(curr_path, str(len(devices)) + " devices loaded")
-    sendlog(curr_path, str(len(commands)) + " commands loaded")
+    sendlog(cnf_save_path, str(len(devices)) + " devices loaded")
+    sendlog(cnf_save_path, str(len(commands)) + " commands loaded")
 
     # connect to devices
     for device in devices:
@@ -245,17 +299,12 @@ def start():
         sendlog(curr_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device) as ssh:
-#                ssh.open()
                 for command in commands:
                     reply = ssh.send_command(command)
                     saveoutfile(cnf_save_path, device['host'], "\n" + "# " + command +"\n" + reply.result + "\n")
         except ScrapliException as error:
             print(error)
-
-        sendlog(curr_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
-
-            #        sendlog(cnf_save_path, str(error) + " " + device["host"])
-#            res = send_show(device, command)
+        sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
 
 
 
