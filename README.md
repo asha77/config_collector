@@ -14,6 +14,7 @@ It created based on Scrapli python library and support it's core platforms:
 - Cisco IOS-XR - cisco_iosxr
 - Arista EOS - arista_eos
 - Juniper JunOS - juniper_junos
+
 ** More platforms from scryply community will be added later.
 
 It use only transport ssh2 -- scrapli wrapper around ssh2-python library. 
