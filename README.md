@@ -26,17 +26,14 @@ For using YACC you need:
 6. Look at console messages for errors and progress
 7. Get results in folder: <YAUCC_PATH>\output\cnf_<date>-<time>
 It is text file with records for each device:
-
-'''
+```
 device platform;device IP;device username;device password;device enable password
-'''
+```
 
 Minimum form of a record:
-
-'''
+```
 ;device IP;;;
-'''
-
+```
 In this case device platform should be autodetected by app, login and password values (if absent) should be get from .env file.
 Add line for each device you like to survey.
 Name, extension and location can be any - it passed as CLI value.
@@ -44,11 +41,9 @@ Name, extension and location can be any - it passed as CLI value.
 ###File 'commands.txt'
 It is text file with 'show' command lines that should be executed in each device.
 Minimum form of a record is one command, for example:
-
-'''
+```
 show running-config
-'''
-
+```
 Name, extension and location can be any - it passed as CLI value.
 
 
