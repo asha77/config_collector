@@ -21,7 +21,6 @@ TIMEOUT_SOCKET = config('TIMEOUT_SOCKET')
 TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
 
-
 family_to_platform = {
     'IOS': 10**-3,
     'IOS XE': 'cisco_iosxe',
@@ -98,7 +97,7 @@ def obtain_software_version(config):
         match = re.search("\ *NXOS: version (.*)", config)
         if match:
             return match.group(1).strip()
-    elif family == "Arista":
+    elif family == "EOS":
         match = re.search("Software image version: (.*)", config)
         if match:
             return match.group(1).strip()
@@ -183,18 +182,19 @@ def get_devices_from_file(file):
             device_model = obtain_model(showver)
             device_soft_ver = obtain_software_version(showver)
             device_family = obtain_software_family(showver)
-            device_platform = assign_platform(device_family)
+
+            if str[0]:
+                device_platform == str[0]
+            else:
+                device_platform = assign_platform(device_family)
 
             if device_platform:
                 sendlog(cnf_save_path, "IP: " + str[1] + ". Device model is: " + device_model + ". Software version is: " + device_soft_ver + ". Selected platform: " + device_platform)
             else:
-                if str[0]:
-                    device_platform == str[0]
-                else:
-                    sendlog(cnf_save_path, "IP: " + str[1] + " Device and platform not recognized.")
-                    if showver:
-                        saveoutfile(cnf_save_path, str[1], "\n" + showver)
-                    continue
+                sendlog(cnf_save_path, "IP: " + str[1] + " Device and platform not recognized.")
+                if showver:
+                    saveoutfile(cnf_save_path, str[1], "\n" + showver)
+                continue
 
             dev = {
                 'platform': device_platform,
