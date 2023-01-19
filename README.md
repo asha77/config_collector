@@ -1,5 +1,5 @@
 # YAUCC - Yet Another Universal Config Collector 
-This python app be used for network survey, or any other operation or maintenance tasks.  
+This python 3.7+ app be used for network survey, or any other operation or maintenance tasks.  
 
 It can:
 - connect using SSHv2 to number of network devices
@@ -19,7 +19,7 @@ It created based on Scrapli python library and support it's core platforms:
 
 It use only transport ssh2 -- scrapli wrapper around ssh2-python library. 
 For using YACC you need:
-1. Install python 3.* (latest - best choice) and reqiured libraries
+1. Install python 3.7+ (latest - best choice) and reqiured libraries
 2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (this file will remains locally)
 3. Put actual devices information into 'devices.txt' file (see below)
 4. Create file and put show commands you'd like to execute into 'commands.txt' or 'cisco_commands.txt' file (see below)
