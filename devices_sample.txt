@@ -1,7 +1,7 @@
-;10.31.70.209;mk;q1q1q1;
-;10.31.75.231;admin;admin;
-;10.31.75.232;admin;admin;
-;10.31.75.229;admin;admin;
-;10.31.75.230;admin;admin;
-;10.31.75.79;root;admin;
-;10.31.75.79;root;GoriGori123;
+;10.31.70.209;mk;q1q1q1;q1q1q1;
+;10.31.75.231;admin;admin;admin;
+;10.31.75.232;admin;admin;admin;
+;10.31.75.229;admin;admin;admin;
+;10.31.75.230;admin;admin;admin;
+;10.31.75.79;root;admin;admin;
+;10.31.75.79;root;GoriGori123;GoriGori123;
