@@ -218,7 +218,7 @@ def get_devices_from_file(file):
                 'auth_password': passw,
                 'auth_secondary': ena_pass,
                 "auth_strict_key": AUTH_STRICT_KEY,
-#                "transport": TRANSPORT,
+                "transport": TRANSPORT,
                 "timeout_socket": int(TIMEOUT_SOCKET),  # timeout for establishing socket/initial connection in seconds
                 "timeout_transport": int(TIMEOUT_TRANSPORT)  # timeout for ssh|telnet transport in seconds
             }
