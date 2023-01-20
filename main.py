@@ -151,7 +151,7 @@ def assign_platform(dev_family):
         platform = family_to_platform[dev_family]
     except KeyError as error:
         # можно также присвоить значение по умолчанию вместо бросания исключения
-        sendlog(curr_path, "No suitable platform for device family {}".format(dev_family))
+        sendlog(cnf_save_path, "No suitable platform for device family {}".format(dev_family))
 #        raise ValueError('Undefined unit: {}'.format(e.args[0]))
         platform = ""
     return platform
@@ -257,7 +257,8 @@ def get_show_version(ip, login, passw):
         with GenericDriver(**my_device) as conn:
             time.sleep(0.1)
             response1 = conn.send_command("terminal length 0")
-            sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
+            if __debug__:
+                sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
             time.sleep(0.1)
             response = conn.send_command("show version")
             time.sleep(0.1)
@@ -316,7 +317,7 @@ def start():
     # connect to devices
     for device in devices:
         devStartTime = datetime.now()
-        sendlog(curr_path, "Starting processing of device {}".format(device['host']))
+        sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device) as ssh:
                 for command in commands:

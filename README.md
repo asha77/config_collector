@@ -1,5 +1,5 @@
 # YAUCC - Yet Another Universal Config Collector 
-This python 3.7+ app be used for network survey, or any other operation or maintenance tasks.  
+This python 3.7 - 3.9 app be used for network survey, or any other operation or maintenance tasks. Tested with 3.9 version.  
 
 It can:
 - connect using SSHv2 to number of network devices
@@ -15,7 +15,7 @@ It created based on Scrapli python library and support it's core platforms:
 - Arista EOS - arista_eos
 - Juniper JunOS - juniper_junos
 
-** More platforms from scryply community will be added later.
+** More platforms from Scraply-community will be added later.
 
 It use only transport ssh2 -- scrapli wrapper around ssh2-python library. 
 For using YACC you need:
