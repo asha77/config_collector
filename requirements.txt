@@ -1,2 +1,4 @@
 scrapli~=2022.7.30.post1
 python-decouple~=3.7
+scrapli_ssh2~=2020.10.24
+scrapli_community~=2022.7.30
