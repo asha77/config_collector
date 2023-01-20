@@ -36,9 +36,9 @@ logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
     resfile = open(file_name, "a")
-    resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " devbot  INFO: " + message + "\n")
+    resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " YAUCC  INFO: " + message + "\n")
     resfile.close()
-    print(str(datetime.now()) + " devbot INFO: " + message)
+    print(str(datetime.now()) + " YAUCC INFO: " + message)
 
 
 def saveoutfile(path, ip, message):
