@@ -7,6 +7,7 @@ import os
 from scrapli.driver import GenericDriver
 import re
 import logging
+import time
 
 
 AUTH_USERNAME = config('AUTH_USERNAME')
@@ -254,10 +255,12 @@ def get_show_version(ip, login, passw):
 
     try:
         with GenericDriver(**my_device) as conn:
-#                response1 = conn.send_command("terminal length 0")
-#                sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
-
-                response = conn.send_command("show version")
+            time.sleep(0.1)
+            response1 = conn.send_command("terminal length 0")
+            sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
+            time.sleep(0.1)
+            response = conn.send_command("show version")
+            time.sleep(0.1)
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
         return ""
