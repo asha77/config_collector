@@ -1,0 +1,5 @@
+/.env
+/output/*.*
+/output/*.*/*.*
+/logfile.log
+/scrapli.log
