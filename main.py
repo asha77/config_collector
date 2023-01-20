@@ -199,7 +199,7 @@ def get_devices_from_file(file):
 
 
             if str[0]:
-                device_platform == str[0]
+                device_platform = str[0]
             else:
                 device_platform = assign_platform(device_family)
 
