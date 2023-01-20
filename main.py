@@ -22,7 +22,7 @@ TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
 
 family_to_platform = {
-    'IOS': 10**-3,
+    'IOS': 'cisco_ios',
     'IOS XE': 'cisco_iosxe',
     'Nexus': 'cisco_nxos',
     'IOS XR': 'cisco_iosxr',
@@ -30,9 +30,7 @@ family_to_platform = {
     'EOS': 'arista_eos'
 }
 
-
 logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
-
 
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
@@ -180,9 +178,25 @@ def get_devices_from_file(file):
                 ena_pass = str[4]
 
             showver = get_show_version(str[1], uname, passw)
+
+            if __debug__:
+                sendlog(cnf_save_path, "show version:\n " + showver)
+
             device_model = obtain_model(showver)
+
+            if __debug__:
+                sendlog(cnf_save_path, "Device model:\n " + device_model)
+
             device_soft_ver = obtain_software_version(showver)
+
+            if __debug__:
+                sendlog(cnf_save_path, "Device software:\n " + device_soft_ver)
+
             device_family = obtain_software_family(showver)
+
+            if __debug__:
+                sendlog(cnf_save_path, "Device family:\n " + device_family)
+
 
             if str[0]:
                 device_platform == str[0]
@@ -240,7 +254,9 @@ def get_show_version(ip, login, passw):
 
     try:
         with GenericDriver(**my_device) as conn:
-                conn.send_command("terminal length 0")
+#                response1 = conn.send_command("terminal length 0")
+#                sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
+
                 response = conn.send_command("show version")
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
