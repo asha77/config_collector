@@ -1,5 +1,9 @@
 /.env
-/output/*.*
-/output/*.*/*.*
+output
+**/output
+**/venv
 /logfile.log
 /scrapli.log
+/devices.txt
+/commands.txt
+/.env
