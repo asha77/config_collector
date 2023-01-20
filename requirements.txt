@@ -1,1 +1,2 @@
 scrapli~=2022.7.30.post1
+python-decouple~=3.7

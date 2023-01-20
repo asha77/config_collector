@@ -1,4 +1,4 @@
-show running-config
+show running-config all
 show version
 show inventory
 show module

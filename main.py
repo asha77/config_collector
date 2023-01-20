@@ -30,6 +30,7 @@ family_to_platform = {
     'EOS': 'arista_eos'
 }
 
+
 logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
 
 
