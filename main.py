@@ -23,7 +23,7 @@ TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
 
 family_to_platform = {
-    'IOS': 'cisco_ios',
+    'IOS': 'cisco_iosxe',
     'IOS XE': 'cisco_iosxe',
     'Nexus': 'cisco_nxos',
     'IOS XR': 'cisco_iosxr',
@@ -320,8 +320,10 @@ def start():
         sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device) as ssh:
+                time.sleep(1)
                 for command in commands:
                     reply = ssh.send_command(command)
+                    time.sleep(1)
                     saveoutfile(cnf_save_path, device['host'], "\n" + "# " + command +"\n" + reply.result + "\n")
         except ScrapliException as error:
             print(error)
