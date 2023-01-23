@@ -1,7 +1,7 @@
-;10.31.70.209;mk;q1q1q1;q1q1q1;
-;10.31.75.231;admin;admin;admin;
-;10.31.75.232;admin;admin;admin;
-;10.31.75.229;admin;admin;admin;
-;10.31.75.230;admin;admin;admin;
-;10.31.75.79;root;admin;admin;
-;10.31.75.79;root;GoriGori123;GoriGori123;
+;10.31.70.209;admin1;pass1;pass2;
+;10.31.75.231;admin1;pass1;pass2;
+;10.31.75.232;admin2;pass3;pass4;
+;10.31.75.229;admin3;pass6;pass5;
+;10.31.75.230;megaadmin;pass8;pass9;
+;10.31.75.79;root;pass;pass;
+;10.31.75.79;root;rootpass;rootpass;

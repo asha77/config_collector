@@ -349,7 +349,7 @@ def start():
     os.chdir(cnf_save_path)
 
     sendlog(cnf_save_path, "Starting at "+date)
-    sendlog(cnf_save_path, "Config save folder is is: " + str(cnf_save_path))
+    sendlog(cnf_save_path, "Config save folder is: " + str(cnf_save_path))
 
     # Get list of available device files
     devices = get_devices_from_file(os.path.join(curr_path, namespace.devfile))
