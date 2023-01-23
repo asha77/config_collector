@@ -31,7 +31,11 @@ family_to_platform = {
     'EOS': 'arista_eos'
 }
 
-logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
+if __debug__:
+    logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
+else:
+    logging.basicConfig(filename="scrapli.log", level=logging.INFO)
+
 
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
@@ -271,6 +275,46 @@ def get_show_version(ip, login, passw):
     return response.result
 
 
+def output_filter(input):
+    '''
+    Output data obfuscation:
+    radius-server key XXXX
+    snmp-server community XXX RX
+    tacacs server server
+        key 6 ХХХ
+    '''
+
+    lines = []
+    lines = input.split('\n')
+
+    for i in range(len(lines)):
+        match = re.search("radius-server key (.*)", lines[i])
+        if match:
+            lines[i] = "radius-server key ХХХ"
+        else:
+            match = re.search("snmp-server community (.*) RO", lines[i])
+            if match:
+                lines[i] = "snmp-server community RO"
+            else:
+                match = re.search("snmp-server community (.*) RW", lines[i])
+                if match:
+                    lines[i] = "snmp-server community RW"
+                else:
+                    match = re.search("\skey (\d) (.*)", lines[i])
+                    if match:
+                        lines[i] = " key " + match.group(1).strip() + " XXX"
+                    else:
+                        match = re.search("username (\w+) privilege (\d+) password (.*)", lines[i])
+                        if match:
+                            lines[i] = "username XXX priviledge " + match.group(2).strip() + " password XXX"
+                        else:
+                            match = re.search("enable secret (\d) (.*)", lines[i])
+                            if match:
+                                lines[i] = "enable secret " + match.group(1).strip() + " XXX"
+
+    return '\n'.join(map(str, lines))
+
+
 def start():
     parser = createparser()
     namespace = parser.parse_args()
@@ -324,7 +368,10 @@ def start():
                 for command in commands:
                     reply = ssh.send_command(command)
                     time.sleep(1)
-                    saveoutfile(cnf_save_path, device['host'], "\n" + "# " + command +"\n" + reply.result + "\n")
+
+                    filtered_result = output_filter(reply.result)
+
+                    saveoutfile(cnf_save_path, device['host'], "\n" + "# " + command +"\n" + filtered_result + "\n")
         except ScrapliException as error:
             print(error)
         sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
