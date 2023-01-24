@@ -79,7 +79,11 @@ def obtain_model(config):
                 if match:
                     return "Arista vEOS"
                 else:
-                    return "Not Found"
+                    match = re.search("ROM: Bootstrap program is Linux", config)
+                    if match:
+                        return "Cisco IOS vRouter "
+                    else:
+                        return "Not Found"
 
 
 def obtain_software_version(config):
@@ -111,10 +115,9 @@ def obtain_software_version(config):
 
 def obtain_software_family(config):
     '''
-    Extract software family
+    Extract software family from show version
     '''
-
-    match = re.search("Cisco IOS XE Software", config)
+    match = re.search("Cisco IOS.XE .oftware", config)
     if match:
         return "IOS XE"
     else:
@@ -122,7 +125,7 @@ def obtain_software_family(config):
         if match:
             return "NX-OS"
         else:
-            match = re.search("Cisco IOS Software,", config)
+            match = re.search("Cisco IOS Software", config)
             if match:
                 return "IOS"
             else:
