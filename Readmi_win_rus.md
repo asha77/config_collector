@@ -23,7 +23,7 @@ https://github.com/git-for-windows/git/releases/download/v2.39.1.windows.1/Git-2
 ```
 AUTH_USERNAME=<указать имя пользователя с которым можно авторизоваться на устройствах>
 AUTH_PASSWORD=<указать пароль этого пользователя>
-AUTH_SECONDARY=<пароль для enable, можно не указывать>
+AUTH_SECONDARY=<пароль для enable, если у пользователя нет привилегий администратора для вывода show команд>
 AUTH_STRICT_KEY=False
 TRANSPORT=sshv2
 TIMEOUT_SOCKET=5

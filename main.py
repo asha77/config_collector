@@ -257,7 +257,7 @@ def get_show_version(ip, login, passw):
         "auth_username": login,
         "auth_password": passw,
         "auth_strict_key": False,
-        "transport": "ssh2"
+        "transport": "ssh2",
     }
 
     try:
