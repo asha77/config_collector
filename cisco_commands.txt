@@ -29,6 +29,7 @@ show vtp status
 show protocols
 show ip protocols
 show ip route
+show ip route all
 show ip route summary
 show ip ospf
 show ip ospf neighbor

@@ -148,7 +148,6 @@ def obtain_hostname(config):
         return "Not Found"
 
 
-
 def assign_platform(dev_family):
     '''
     Assign device platform based on device family
@@ -166,6 +165,7 @@ def assign_platform(dev_family):
 
 def get_devices_from_file(file):
     devices = []
+    hostnames = []
     with open(file) as f:
         for line in f.readlines():
             str = line.split(";")
@@ -185,7 +185,7 @@ def get_devices_from_file(file):
             else:
                 ena_pass = str[4]
 
-            showver = get_show_version(str[1], uname, passw)
+            showver, hname = get_show_version(str[1], uname, passw)
 
             if __debug__:
                 sendlog(cnf_save_path, "show version:\n " + showver)
@@ -205,7 +205,6 @@ def get_devices_from_file(file):
             if __debug__:
                 sendlog(cnf_save_path, "Device family:\n " + device_family)
 
-
             if str[0]:
                 device_platform = str[0]
             else:
@@ -216,7 +215,7 @@ def get_devices_from_file(file):
             else:
                 sendlog(cnf_save_path, "IP: " + str[1] + " Device and platform not recognized.")
                 if showver:
-                    saveoutfile(cnf_save_path, str[1], "\n" + showver)
+                    saveoutfile(cnf_save_path, str[1] + "_" + get_hostname_by_ip(str[1]), "\n" + showver)
                 continue
 
             dev = {
@@ -227,11 +226,19 @@ def get_devices_from_file(file):
                 'auth_secondary': ena_pass,
                 "auth_strict_key": AUTH_STRICT_KEY,
                 "transport": TRANSPORT,
-                "timeout_socket": int(TIMEOUT_SOCKET),  # timeout for establishing socket/initial connection in seconds
-                "timeout_transport": int(TIMEOUT_TRANSPORT)  # timeout for ssh|telnet transport in seconds
+                "timeout_socket": int(TIMEOUT_SOCKET),          # timeout for establishing socket/initial connection in seconds
+                "timeout_transport": int(TIMEOUT_TRANSPORT)    # timeout for ssh|telnet transport in seconds
             }
             devices.append(dev)
-    return(devices)
+
+            hn = {
+                "hostname": hname,
+                "ip": str[1]
+            }
+
+            hostnames.append(hn)
+
+    return(devices, hostnames)
 
 
 def get_commands_from_file(file):
@@ -257,17 +264,46 @@ def get_show_version(ip, login, passw):
         "auth_username": login,
         "auth_password": passw,
         "auth_strict_key": False,
+        "transport": "ssh2"
+    }
+
+    try:
+        with GenericDriver(**my_device) as conn:
+            time.sleep(0.1)
+            hname = conn.get_prompt()
+            time.sleep(0.1)
+            response1 = conn.send_command("terminal length 0", strip_prompt = False)
+            if __debug__:
+                sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
+            time.sleep(0.1)
+            response = conn.send_command("show version", strip_prompt = False)
+            time.sleep(0.1)
+    except ScrapliAuthenticationFailed as error:
+        sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
+        return "",""
+    except ScrapliException as error:
+        sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
+        return "",""
+    return response.result, hname[:-1]
+
+
+def get_show_run(ip, login, passw):
+    my_device = {
+        "host": ip,
+        "auth_username": login,
+        "auth_password": passw,
+        "auth_strict_key": False,
         "transport": "ssh2",
     }
 
     try:
         with GenericDriver(**my_device) as conn:
             time.sleep(0.1)
-            response1 = conn.send_command("terminal length 0")
+            response1 = conn.send_command("terminal length 0", False)
             if __debug__:
                 sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
             time.sleep(0.1)
-            response = conn.send_command("show version")
+            response = conn.send_command("show running-config", False)
             time.sleep(0.1)
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
@@ -314,8 +350,13 @@ def output_filter(input):
                             match = re.search("enable secret (\d) (.*)", lines[i])
                             if match:
                                 lines[i] = "enable secret " + match.group(1).strip() + " XXX"
-
     return '\n'.join(map(str, lines))
+
+
+def get_hostname_by_ip(ip, hostnames):
+    for record in hostnames:
+        if record["ip"] == ip:
+            return record["hostname"]
 
 
 def start():
@@ -355,7 +396,7 @@ def start():
     sendlog(cnf_save_path, "Config save folder is: " + str(cnf_save_path))
 
     # Get list of available device files
-    devices = get_devices_from_file(os.path.join(curr_path, namespace.devfile))
+    devices, hostnames = get_devices_from_file(os.path.join(curr_path, namespace.devfile))
     # Get list of available device files
     commands = get_commands_from_file(os.path.join(curr_path, namespace.comfiles))
     sendlog(cnf_save_path, str(len(devices)) + " devices loaded")
@@ -371,14 +412,11 @@ def start():
                 for command in commands:
                     reply = ssh.send_command(command)
                     time.sleep(1)
-
                     filtered_result = output_filter(reply.result)
-
-                    saveoutfile(cnf_save_path, device['host'], "\n" + "# " + command +"\n" + filtered_result + "\n")
+                    saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
         except ScrapliException as error:
             print(error)
         sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
-
 
 
 if __name__ == '__main__':
