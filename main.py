@@ -92,7 +92,11 @@ def obtain_model(config):
                             if match:
                                 return 'Huawei CE' + match.group(1).strip()
                             else:
-                                return "Not Found"
+                                match = re.search('Huawei\s(\S+)\s+Router\s\S*', config)
+                                if match:
+                                    return 'Huawei ' + match.group(1).strip()
+                                else:
+                                    return "Not Found"
 
 
 def obtain_software_version(config, family):
