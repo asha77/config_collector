@@ -28,7 +28,8 @@ family_to_platform = {
     'Nexus': 'cisco_nxos',
     'IOS XR': 'cisco_iosxr',
     'JUNOS': 'juniper_junos',
-    'EOS': 'arista_eos'
+    'EOS': 'arista_eos',
+    'VRP': 'huawei_vrp'
 }
 
 if __debug__:
@@ -39,7 +40,7 @@ else:
 
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
-    resfile = open(file_name, "a")
+    resfile = open(file_name, 'a', encoding='utf-8')
     resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " YAUCC  INFO: " + message + "\n")
     resfile.close()
     print(str(datetime.now()) + " YAUCC INFO: " + message)
@@ -47,7 +48,7 @@ def sendlog(path, message):
 
 def saveoutfile(path, ip, message):
     file_name = os.path.join(path, ip+'.log')
-    resfile = open(file_name, "a")
+    resfile = open(file_name, "a", encoding='utf-8')
     resfile.write(message)
     resfile.close()
 
@@ -63,15 +64,15 @@ def obtain_model(config):
     '''
     Extract model number
     '''
-    match = re.search("Model \wumber\ *: (.*)", config)
+    match = re.search("Model\s+\wumber\s*:\s+(.*)", config)
     if match:
         return match.group(1).strip()
     else:
-        match = re.search("\wisco (\S+) .* (with)*\d+K\/\d+K bytes of memory.", config)
+        match = re.search("\wisco\s+(\S+)\s+.*\s+(with)*\d+K\/\d+K\sbytes\sof\smemory.", config)
         if match:
             return match.group(1).strip()
         else:
-            match = re.search("\ \ cisco Nexus9000 (.*) Chassis", config)
+            match = re.search("\s+cisco Nexus9000 (.*) Chassis", config)
             if match:
                 return "N9K-"+match.group(1).strip()
             else:
@@ -83,30 +84,40 @@ def obtain_model(config):
                     if match:
                         return "Cisco IOS vRouter "
                     else:
-                        return "Not Found"
+                        match = re.search('(Quidway|HUAWEI)\s(\S+)\s+Routing\sSwitch\S*', config)
+                        if match:
+                            return 'Huawei ' +match.group(2).strip()
+                        else:
+                            match = re.search('HUAWEI\sCE(\S+)\s+uptime\S*', config)
+                            if match:
+                                return 'Huawei CE' + match.group(1).strip()
+                            else:
+                                return "Not Found"
 
 
-def obtain_software_version(config):
+def obtain_software_version(config, family):
     '''
     Extract software version
     '''
 
-    family = obtain_software_family(config)
-
-    if family == "IOS XE":
+    if family == 'IOS XE':
         match = re.search("Cisco .+ Version ([0-9.()A-Za-z]+)", config)
         if match:
             return match.group(1).strip()
-    elif family == "IOS":
+    elif family == 'IOS':
         match = re.search("Cisco .+ Version ([0-9.()A-Za-z]+)", config)
         if match:
             return match.group(1).strip()
-    elif family == "NX-OS":
-        match = re.search("\ *NXOS: version (.*)", config)
+    elif family == 'NX-OS':
+        match = re.search("\s*NXOS: version (.*)", config)
         if match:
             return match.group(1).strip()
-    elif family == "EOS":
+    elif family == 'EOS':
         match = re.search("Software image version: (.*)", config)
+        if match:
+            return match.group(1).strip()
+    elif family == 'VRP':
+        match = re.search("VRP \(R\) software, Version (.*)", config)
         if match:
             return match.group(1).strip()
     else:
@@ -133,7 +144,11 @@ def obtain_software_family(config):
                 if match:
                     return "EOS"
                 else:
-                    return "Not Found"
+                    match = re.search("Huawei Versatile Routing Platform", config)
+                    if match:
+                        return "VRP"
+                    else:
+                        return "Not Found"
 
 
 def obtain_hostname(config):
@@ -187,6 +202,9 @@ def get_devices_from_file(file):
 
             showver, hname = get_show_version(str[1], uname, passw)
 
+            if((showver == '') and (hname == '')):
+                continue
+
             if __debug__:
                 sendlog(cnf_save_path, "show version:\n " + showver)
 
@@ -195,12 +213,11 @@ def get_devices_from_file(file):
             if __debug__:
                 sendlog(cnf_save_path, "Device model:\n " + device_model)
 
-            device_soft_ver = obtain_software_version(showver)
+            device_family = obtain_software_family(showver)
+            device_soft_ver = obtain_software_version(showver, device_family)
 
             if __debug__:
                 sendlog(cnf_save_path, "Device software:\n " + device_soft_ver)
-
-            device_family = obtain_software_family(showver)
 
             if __debug__:
                 sendlog(cnf_save_path, "Device family:\n " + device_family)
@@ -258,6 +275,16 @@ def send_show(device, show_command):
         print(error)
 '''
 
+
+def strip_characters_from_prompt(prompt):
+    prompt = prompt.replace('#', '')
+    prompt = prompt.replace('<', '')
+    prompt = prompt.replace('>', '')
+    prompt = prompt.replace('[', '')
+    prompt = prompt.replace(']', '')
+    return prompt
+
+
 def get_show_version(ip, login, passw):
     my_device = {
         "host": ip,
@@ -267,24 +294,55 @@ def get_show_version(ip, login, passw):
         "transport": "ssh2"
     }
 
+    vendor = 'cisco'
+    hname = ''
     try:
         with GenericDriver(**my_device) as conn:
             time.sleep(0.1)
             hname = conn.get_prompt()
             time.sleep(0.1)
+
             response1 = conn.send_command("terminal length 0", strip_prompt = False)
+            time.sleep(0.1)
+
+            #            if '% Invalid input detected' in response1:  Cisco error string
+
+            # if not Cisco and we get error try Huawei
+            if 'Error: Unrecog' in response1.result:
+                response1 = conn.send_command("screen-length 0 temporary", strip_prompt=False)
+                time.sleep(0.1)
+                vendor = 'huawei'
+
             if __debug__:
                 sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
-            time.sleep(0.1)
-            response = conn.send_command("show version", strip_prompt = False)
-            time.sleep(0.1)
+
+            if vendor == 'cisco':
+                response = conn.send_command("show version", strip_prompt = False)
+                time.sleep(0.1)
+            elif vendor == 'huawei':
+                response = conn.send_command("display version", strip_prompt = False)
+                time.sleep(0.1)
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
         return "",""
     except ScrapliException as error:
         sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
-        return "",""
-    return response.result, hname[:-1]
+        if response.result is not None:
+            if ((not response.result == '') and (not hname == '')):
+                return response.result, strip_characters_from_prompt(hname)
+            else:
+                return '', ''
+        else:
+            return '', ''
+    finally:
+        if response.result is not None:
+            if ((not response.result == '') and (not hname == '')):
+                return response.result, strip_characters_from_prompt(hname)
+            else:
+                return '', ''
+        else:
+            return '', ''
+    return response.result, strip_characters_from_prompt(hname)
 
 
 def get_show_run(ip, login, passw):
