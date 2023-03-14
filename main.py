@@ -395,11 +395,11 @@ def output_filter(input):
         else:
             match = re.search("snmp-server community (.*) RO", lines[i])
             if match:
-                lines[i] = "snmp-server community RO"
+                lines[i] = "snmp-server community XXX RO"
             else:
                 match = re.search("snmp-server community (.*) RW", lines[i])
                 if match:
-                    lines[i] = "snmp-server community RW"
+                    lines[i] = "snmp-server community XXX RW"
                 else:
                     match = re.search("\skey (\d) (.*)", lines[i])
                     if match:
@@ -412,6 +412,30 @@ def output_filter(input):
                             match = re.search("enable secret (\d) (.*)", lines[i])
                             if match:
                                 lines[i] = "enable secret " + match.group(1).strip() + " XXX"
+                            else:
+                                match = re.search("radius server shared-key(.*)", lines[i])
+                                if match:
+                                    lines[i] = "radius server shared-key cipher XXX"
+                                else:
+                                    match = re.search("\s*local-user(.*)", lines[i])
+                                    if match:
+                                        lines[i] = " local-user XXX"
+                                    else:
+                                        match = re.search("\s*ospf authentication(.*)", lines[i])
+                                        if match:
+                                            lines[i] = " ospf authentication XXX"
+                                        else:
+                                            match = re.search("\s*(.*)\scipher(.*)", lines[i])
+                                            if match:
+                                                lines[i] = ' ' +  match.group(1).strip() + ' cipher XXX'
+                                            else:
+                                                match = re.search("\s*pre-shared-key(.*)", lines[i])
+                                                if match:
+                                                    lines[i] = " pre-shared-key XXX"
+                                                else:
+                                                    match = re.search("\s*ssh user\s(\w+)(.*)", lines[i])
+                                                    if match:
+                                                        lines[i] = " ssh user XXX " + match.group(2).strip()
     return '\n'.join(map(str, lines))
 
 
@@ -469,7 +493,7 @@ def start():
         devStartTime = datetime.now()
         sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
-            with Scrapli(**device) as ssh:
+            with Scrapli(**device, timeout_ops=180) as ssh:
                 time.sleep(1)
                 for command in commands:
                     reply = ssh.send_command(command)
