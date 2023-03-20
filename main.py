@@ -96,7 +96,11 @@ def obtain_model(config):
                                 if match:
                                     return 'Huawei ' + match.group(1).strip()
                                 else:
-                                    return "Not Found"
+                                    match = re.search('Build\sID\s+: (\S-\S).*', config)
+                                    if match:
+                                        return match.group(1).strip()
+                                    else:
+                                        return "Not Found"
 
 
 def obtain_software_version(config, family):
@@ -122,6 +126,10 @@ def obtain_software_version(config, family):
             return match.group(1).strip()
     elif family == 'VRP':
         match = re.search("VRP \(R\) software, Version (.*)", config)
+        if match:
+            return match.group(1).strip()
+    elif family == 'ARUBAOS':
+        match = re.search("Version\s+:\s(.*)", config)
         if match:
             return match.group(1).strip()
     else:
@@ -152,7 +160,11 @@ def obtain_software_family(config):
                     if match:
                         return "VRP"
                     else:
-                        return "Not Found"
+                        match = re.search("ArubaOS", config)
+                        if match:
+                            return "ARUBAOS"
+                        else:
+                            return "Not Found"
 
 
 def obtain_hostname(config):
