@@ -535,9 +535,14 @@ def start():
             with Scrapli(**device, timeout_ops=180) as ssh:
                 time.sleep(1)
                 for command in commands:
+
+                    if __debug__:
+                        sendlog(cnf_save_path, device['host'] + " send command " + command)
+
                     reply = ssh.send_command(command)
                     time.sleep(1)
                     filtered_result = output_filter(reply.result)
+
 
                     saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
         except ScrapliException as error:
