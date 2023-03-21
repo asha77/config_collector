@@ -1,5 +1,5 @@
 from scrapli import Scrapli
-from scrapli.exceptions import ScrapliException, ScrapliAuthenticationFailed
+from scrapli.exceptions import ScrapliException, ScrapliAuthenticationFailed, ScrapliConnectionNotOpened
 from decouple import config
 import argparse
 from datetime import datetime
@@ -201,20 +201,33 @@ def get_devices_from_file(file):
         for line in f.readlines():
             str = line.split(";")
 
-            if str[2] == "":
+            if len(str) < 2:
+                print('Error - wrong devices file format')
+                return [], []
+
+            if len(str) > 2:
+                if not str[2] == "":
+                    uname = str[2]
+                else:
+                    uname = AUTH_USERNAME
+            else:
                 uname = AUTH_USERNAME
-            else:
-                uname = str[2]
 
-            if str[3] == "":
+            if len(str) > 3:
+                if not str[3] == "":
+                    passw = str[3]
+                else:
+                    passw = AUTH_PASSWORD
+            else:
                 passw = AUTH_PASSWORD
-            else:
-                passw = str[3]
 
-            if str[4] == "":
-                ena_pass = AUTH_SECONDARY
+            if len(str) > 4:
+                if not str[4] == "":
+                    ena_pass = str[4]
+                else:
+                    ena_pass = AUTH_SECONDARY
             else:
-                ena_pass = str[4]
+                ena_pass = AUTH_SECONDARY
 
             showver, hname = get_show_version(str[1], uname, passw)
 
@@ -312,38 +325,53 @@ def get_show_version(ip, login, passw):
 
     vendor = 'cisco'
     hname = ''
+    response = ''
+
     try:
         with GenericDriver(**my_device) as conn:
             time.sleep(0.1)
             hname = conn.get_prompt()
             time.sleep(0.1)
 
-            response1 = conn.send_command("terminal length 0", strip_prompt = False)
+            response = conn.send_command("terminal length 0", strip_prompt = False)
             time.sleep(0.1)
 
-            #            if '% Invalid input detected' in response1:  Cisco error string
+            # if '% Invalid input detected' in response1:  Cisco error string
 
             # if not Cisco and we get error try Huawei
-            if 'Error: Unrecog' in response1.result:
-                response1 = conn.send_command("screen-length 0 temporary", strip_prompt=False)
-                time.sleep(0.1)
+            if 'Error: Unrecog' in response.result:
+                response = conn.send_command("screen-length 0 temporary", strip_prompt=False)
+                time.sleep(0.5)
                 vendor = 'huawei'
 
+            if 'Invalid input: 0' in response.result:
+                response = conn.send_command("no page", strip_prompt=False)
+                time.sleep(0.5)
+                vendor = 'aruba'
+
+
             if __debug__:
-                sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
+                sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response.result)
 
             if vendor == 'cisco':
                 response = conn.send_command("show version", strip_prompt = False)
-                time.sleep(0.1)
+                time.sleep(0.5)
             elif vendor == 'huawei':
                 response = conn.send_command("display version", strip_prompt = False)
-                time.sleep(0.1)
+                time.sleep(0.5)
+            elif vendor == 'aruba':
+                response = conn.send_command("show system", strip_prompt = False)
+                time.sleep(0.5)
+
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
-        return "",""
+        return '', ''
+    except ScrapliConnectionNotOpened as error:
+        sendlog(cnf_save_path, "IP: " + ip + " Connection Error " +str(error) + " - please, check device exist or online.")
+        return '', ''
     except ScrapliException as error:
         sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
-        if response.result is not None:
+        if hasattr(response, 'result'):
             if ((not response.result == '') and (not hname == '')):
                 return response.result, strip_characters_from_prompt(hname)
             else:
@@ -351,14 +379,13 @@ def get_show_version(ip, login, passw):
         else:
             return '', ''
     finally:
-        if response.result is not None:
+        if hasattr(response, 'result'):
             if ((not response.result == '') and (not hname == '')):
                 return response.result, strip_characters_from_prompt(hname)
             else:
                 return '', ''
         else:
             return '', ''
-    return response.result, strip_characters_from_prompt(hname)
 
 
 def get_show_run(ip, login, passw):
