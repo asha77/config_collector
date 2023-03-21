@@ -538,6 +538,7 @@ def start():
                     reply = ssh.send_command(command)
                     time.sleep(1)
                     filtered_result = output_filter(reply.result)
+
                     saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
         except ScrapliException as error:
             print(error)
