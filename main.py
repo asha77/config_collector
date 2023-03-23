@@ -538,14 +538,14 @@ def start():
         sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device, timeout_ops=180) as ssh:
-                time.sleep(1)
+                time.sleep(0.2)
                 for command in commands:
 
                     if __debug__:
                         sendlog(cnf_save_path, device['host'] + " send command " + command)
 
                     reply = ssh.send_command(command)
-                    time.sleep(1)
+                    time.sleep(0.2)
                     filtered_result = output_filter(reply.result)
 
                     if __debug__:
