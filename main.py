@@ -43,7 +43,8 @@ def sendlog(path, message):
     resfile = open(file_name, 'a', encoding='utf-8')
     resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " YAUCC  INFO: " + message + "\n")
     resfile.close()
-    print(str(datetime.now()) + " YAUCC INFO: " + message)
+    print(str(datetime.now()) + " YAUCC INFO: " + message.strip('\n'))
+    return True
 
 
 def saveoutfile(path, ip, message):
@@ -247,8 +248,6 @@ def get_devices_from_file(file):
 
             if __debug__:
                 sendlog(cnf_save_path, "Device software:\n " + device_soft_ver)
-
-            if __debug__:
                 sendlog(cnf_save_path, "Device family:\n " + device_family)
 
             if str[0]:
@@ -264,12 +263,18 @@ def get_devices_from_file(file):
                     saveoutfile(cnf_save_path, str[1] + "_" + get_hostname_by_ip(str[1]), "\n" + showver)
                 continue
 
+            if __debug__:
+                chlog = True
+            else:
+                chlog = False
+
             dev = {
                 'platform': device_platform,
                 'host': str[1],
                 'auth_username': uname,
                 'auth_password': passw,
                 'auth_secondary': ena_pass,
+                'channel_log': chlog,
                 "auth_strict_key": AUTH_STRICT_KEY,
                 "transport": TRANSPORT,
                 "timeout_socket": int(TIMEOUT_SOCKET),          # timeout for establishing socket/initial connection in seconds
@@ -344,7 +349,7 @@ def get_show_version(ip, login, passw):
                 time.sleep(0.5)
                 vendor = 'huawei'
 
-            if 'Invalid input: 0' in response.result:
+            if 'Invalid input:' in response.result:
                 response = conn.send_command("no page", strip_prompt=False)
                 time.sleep(0.5)
                 vendor = 'aruba'
@@ -543,6 +548,17 @@ def start():
                     time.sleep(1)
                     filtered_result = output_filter(reply.result)
 
+                    if __debug__:
+                        if filtered_result:
+                            ln = len(filtered_result)
+                            if ln > 20:
+                                ln = 20
+                                suffix = ' ...'
+                            sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' received: ' + filtered_result[0:ln-1].replace('\n', ' ') + suffix)
+                        else:
+                            sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' nothing received!')
+
+                    reply.elapsed_time
 
                     saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
         except ScrapliException as error:
