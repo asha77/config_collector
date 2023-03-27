@@ -540,25 +540,21 @@ def start():
             with Scrapli(**device, timeout_ops=180) as ssh:
                 time.sleep(0.2)
                 for command in commands:
-
                     if __debug__:
-                        sendlog(cnf_save_path, device['host'] + " send command " + command)
+                        sendlog(cnf_save_path, device['host'] + " send command: " + command)
 
                     reply = ssh.send_command(command)
-                    time.sleep(0.2)
-                    filtered_result = output_filter(reply.result)
 
-                    if __debug__:
-                        if filtered_result:
+                    if reply.result:
+                        filtered_result = output_filter(reply.result)
+
+                        if __debug__:
                             ln = len(filtered_result)
                             if ln > 20:
                                 ln = 20
-                                suffix = ' ...'
-                            sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' received: ' + filtered_result[0:ln-1].replace('\n', ' ') + suffix)
-                        else:
-                            sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' nothing received!')
-
-                    reply.elapsed_time
+                                sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' received: ' + filtered_result[0:ln-1].replace('\n', ' ') + ' ...')
+                    else:
+                        sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' nothing received!')
 
                     saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
         except ScrapliException as error:
