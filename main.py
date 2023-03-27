@@ -546,6 +546,8 @@ def start():
                     reply = ssh.send_command(command)
                     time.sleep(0.2)
 
+                    sendlog(cnf_save_path, reply.result)
+
                     if reply.result:
                         filtered_result = output_filter(reply.result)
 
