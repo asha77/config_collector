@@ -1,10 +1,11 @@
 show running-config
 show version
 show system information
+show system memory
+show system fans
 show inventory
 show tech components
-show system memory
-show interfaces status
+# show interfaces status
 show vlan ports
 show vlan
 show mac address-table
@@ -14,8 +15,6 @@ show cdp neighbors detail
 show lldp info remote-device
 show lldp info remote-device detail
 show system information
-show system memory
-show system fans
 show trunks
 show int transceiver
 show log
