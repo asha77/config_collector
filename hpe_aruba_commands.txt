@@ -8,7 +8,7 @@ show tech components
 # show interfaces status
 show vlan ports
 show vlan
-show mac address-table
+show mac-address detail
 show ip
 show cdp neighbors
 show cdp neighbors detail

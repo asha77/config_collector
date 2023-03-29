@@ -296,7 +296,8 @@ def get_commands_from_file(file):
     commands = []
     with open(file) as f:
         for line in f.readlines():
-            commands.append(line)
+            if line.find('#') == -1:
+                commands.append(line.strip('\n'))
     return(commands)
 
 '''
@@ -339,34 +340,32 @@ def get_show_version(ip, login, passw):
             time.sleep(0.1)
 
             response = conn.send_command("terminal length 0", strip_prompt = False)
-            time.sleep(0.1)
 
             # if '% Invalid input detected' in response1:  Cisco error string
 
             # if not Cisco and we get error try Huawei
             if 'Error: Unrecog' in response.result:
                 response = conn.send_command("screen-length 0 temporary", strip_prompt=False)
-                time.sleep(0.5)
                 vendor = 'huawei'
 
             if 'Invalid input:' in response.result:
                 response = conn.send_command("no page", strip_prompt=False)
-                time.sleep(0.5)
                 vendor = 'aruba'
-
 
             if __debug__:
                 sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response.result)
 
+            time.sleep(0.5)
+
             if vendor == 'cisco':
                 response = conn.send_command("show version", strip_prompt = False)
-                time.sleep(0.5)
+                time.sleep(0.2)
             elif vendor == 'huawei':
                 response = conn.send_command("display version", strip_prompt = False)
-                time.sleep(0.5)
+                time.sleep(0.2)
             elif vendor == 'aruba':
                 response = conn.send_command("show system", strip_prompt = False)
-                time.sleep(0.5)
+                time.sleep(0.2)
 
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
@@ -542,9 +541,9 @@ def start():
                     if __debug__:
                         sendlog(cnf_save_path, device['host'] + " send command: " + command)
 
-                    time.sleep(1)
+                    time.sleep(0.2)
                     reply = ssh.send_command(command)
-                    time.sleep(1)
+                    time.sleep(0.2)
 
                     if __debug__:
                         sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
@@ -557,10 +556,11 @@ def start():
                             if ln > 20:
                                 ln = 20
                                 sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' received: ' + filtered_result[0:ln-1].replace('\n', ' ') + ' ...')
-                    else:
-                        sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' nothing received!')
 
-                    saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
+                        saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
+                    else:
+                        sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' bad result received!')
+
         except ScrapliException as error:
             print(error)
         sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
