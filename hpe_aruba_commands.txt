@@ -4,8 +4,7 @@ show system information
 show system memory
 show system fans
 show inventory
-show tech components
-# show interfaces status
+# show interfaces status - give EOF error
 show vlan ports
 show vlan
 show mac-address detail
@@ -17,5 +16,9 @@ show lldp info remote-device detail
 show system information
 show trunks
 show int transceiver
-show log
 show ip route
+show tech instrumentation
+show tech isp
+show tech transceivers
+show log
+# show tech all - too much input

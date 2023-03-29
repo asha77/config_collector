@@ -101,7 +101,11 @@ def obtain_model(config):
                                     if match:
                                         return match.group(1).strip()
                                     else:
-                                        return "Not Found"
+                                        match = re.search('\s*Product\sSKU\s*:\s(\S*)', config)
+                                        if match:
+                                            return match.group(1).strip()
+                                        else:
+                                            return "Not Found"
 
 
 def obtain_software_version(config, family):
@@ -130,7 +134,7 @@ def obtain_software_version(config, family):
         if match:
             return match.group(1).strip()
     elif family == 'ARUBAOS':
-        match = re.search("Version\s+:\s(.*)", config)
+        match = re.search("\s*Software revision\s*:\s*(\S+)", config)
         if match:
             return match.group(1).strip()
     else:
@@ -165,7 +169,11 @@ def obtain_software_family(config):
                         if match:
                             return "ARUBAOS"
                         else:
-                            return "Not Found"
+                            match = re.search("\s*Software revision\s*:\s*(\S+)", config)
+                            if match:
+                                return "ARUBAOS"
+                            else:
+                                return "Not Found"
 
 
 def obtain_hostname(config):
@@ -260,7 +268,7 @@ def get_devices_from_file(file):
             else:
                 sendlog(cnf_save_path, "IP: " + str[1] + " Device and platform not recognized.")
                 if showver:
-                    saveoutfile(cnf_save_path, str[1] + "_" + get_hostname_by_ip(str[1]), "\n" + showver)
+                    saveoutfile(cnf_save_path, str[1] + "_" + hname, "\n" + showver)
                 continue
 
             if __debug__:
@@ -366,6 +374,9 @@ def get_show_version(ip, login, passw):
             elif vendor == 'aruba':
                 response = conn.send_command("show system", strip_prompt = False)
                 time.sleep(0.2)
+                response1 = conn.send_command("show system mem", strip_prompt = False)
+                time.sleep(0.2)
+                response.result = response.result + '\n' + response1.result
 
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
@@ -404,11 +415,11 @@ def get_show_run(ip, login, passw):
     try:
         with GenericDriver(**my_device) as conn:
             time.sleep(0.1)
-            response1 = conn.send_command("terminal length 0", False)
+            response1 = conn.send_command("terminal length 0", strip_prompt=False)
             if __debug__:
                 sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
             time.sleep(0.1)
-            response = conn.send_command("show running-config", False)
+            response = conn.send_command("show running-config", strip_prompt=False)
             time.sleep(0.1)
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
