@@ -29,7 +29,8 @@ family_to_platform = {
     'IOS XR': 'cisco_iosxr',
     'JUNOS': 'juniper_junos',
     'EOS': 'arista_eos',
-    'VRP': 'huawei_vrp'
+    'VRP': 'huawei_vrp',
+    'ARUBA AOS-S': 'aruba_aoscx'
 }
 
 if __debug__:
@@ -133,7 +134,7 @@ def obtain_software_version(config, family):
         match = re.search("VRP \(R\) software, Version (.*)", config)
         if match:
             return match.group(1).strip()
-    elif family == 'ARUBAOS':
+    elif family == 'ARUBA AOS-S':
         match = re.search("\s*Software revision\s*:\s*(\S+)", config)
         if match:
             return match.group(1).strip()
@@ -171,7 +172,7 @@ def obtain_software_family(config):
                         else:
                             match = re.search("\s*Software revision\s*:\s*(\S+)", config)
                             if match:
-                                return "ARUBAOS"
+                                return "ARUBA AOS-S"
                             else:
                                 return "Not Found"
 
