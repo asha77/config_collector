@@ -27,7 +27,8 @@ For using YACC you need:
 6. Look at console messages for errors and progress.
 7. Get results in folder: <YAUCC_PATH>\output\cnf_<date>-<time>
 
-##File 'devices.txt'
+## File 'devices.txt'
+
 It is text file with records for each device:
 ```
 device platform;device IP;device username;device password;device enable password;
