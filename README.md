@@ -6,7 +6,7 @@ It can:
 - execute series of show commands on network  devices 
 - write output of executed commands into files in one folder 
 
-YAUCC not tested for configuration commands, but there are no any special restrictions for them.  
+## WARNING!!! YAUCC not tested for configuration commands, but there are no any special restrictions for them.
 
 It created based on Scrapli python library and support it's core platforms:
 - Cisco IOS-XE - cisco_iosxe
@@ -27,7 +27,7 @@ For using YACC you need:
 6. Look at console messages for errors and progress.
 7. Get results in folder: <YAUCC_PATH>\output\cnf_<date>-<time>
 
-###File 'devices.txt'
+##File 'devices.txt'
 It is text file with records for each device:
 ```
 device platform;device IP;device username;device password;device enable password;
@@ -39,14 +39,8 @@ Minimum form of a record:
 In this case device platform should be tried to be autodetected by app, login and password values (if absent) should be get from .env file.
 Add line for each device you like to survey. File name, extension and location can be any - it passed as CLI value.
 Example of devices file included into repo: 'devices_sample.txt'
+File names, extension and location can be any - it is passed as CLI value.
 
-###File 'commands.txt'
-Script provided with some text files with 'show' commands for supported platforms, that should be executed on each device. 
-Not all commands are relevant for any device - it is excessive and can provide errors in log. 
-For unknown or not successfully autodetected platform commands from 'default_commands.txt' can be executed.
-Minimum form of a record is one command, for example:
-```
-show running-config
-show ver
-```
-File names, extensions and locations can be any - it passed as CLI value.
+Script provided with set of files with lists of 'show' commands for supported platforms. These commands should be executed on each device. 
+These lists are excessive (not all commands are relevant for any device) and can produce errors in log. 
+For unknown or not successfully autodetected platform, commands from 'default_commands.txt' file should be executed.
