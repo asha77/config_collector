@@ -33,6 +33,20 @@ family_to_platform = {
     'ARUBA AOS-S': 'aruba_aoscx'
 }
 
+# To change if any special list of commands for special platforms
+platform_to_commands = {
+    'cisco_iosxe': 'cisco_commands.txt',
+    'cisco_nxos': 'cisco_commands.txt',
+    'cisco_iosxr': 'cisco_commands.txt',
+    'juniper_junos': 'juniper_commands.txt',
+    'arista_eos': 'cisco_commands.txt',
+    'huawei_vrp': 'huawei_commands.txt',
+    'aruba_aoscx': 'hpe_aruba_commands.txt',
+    'unknown_platform': 'default_commands.txt'
+
+}
+
+
 if __debug__:
     logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
 else:
@@ -58,7 +72,7 @@ def saveoutfile(path, ip, message):
 def createparser():
     parser = argparse.ArgumentParser(prog='YAUCC - Yet Another Universal Config Collector', description='Python app for executing commands on network equipment using SSH', epilog='author: asha77@gmail.com')
     parser.add_argument('-d', '--devfile', required=True, help='Specify file with set of devices')
-    parser.add_argument('-c', '--comfiles', required=True, help='Specify file with set of commands')
+#    parser.add_argument('-c', '--comfiles', required=True, help='Specify file with set of commands')
     return parser
 
 
@@ -174,7 +188,7 @@ def obtain_software_family(config):
                             if match:
                                 return "ARUBA AOS-S"
                             else:
-                                return "Not Found"
+                                return "unknown_platform"
 
 
 def obtain_hostname(config):
@@ -510,9 +524,9 @@ def start():
         print("Path to file with list of devices required! Key: -d <path>")
         exit()
 
-    if (namespace.comfiles is None):
-        print("Path to file with list of commands required! Key: -с <path>")
-        exit()
+#    if (namespace.comfiles is None):
+#        print("Path to file with list of commands required! Key: -с <path>")
+#        exit()
 
     startTime = datetime.now()
 
@@ -538,14 +552,15 @@ def start():
 
     # Get list of available device files
     devices, hostnames = get_devices_from_file(os.path.join(curr_path, namespace.devfile))
-    # Get list of available device files
-    commands = get_commands_from_file(os.path.join(curr_path, namespace.comfiles))
+
     sendlog(cnf_save_path, str(len(devices)) + " devices loaded")
-    sendlog(cnf_save_path, str(len(commands)) + " commands loaded")
+#    sendlog(cnf_save_path, str(len(commands)) + " commands loaded")
 
     # connect to devices
     for device in devices:
         devStartTime = datetime.now()
+
+        commands = get_commands_from_file(os.path.join(curr_path, platform_to_commands[device['platform']]))
         sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device, timeout_ops=180) as ssh:
@@ -571,7 +586,7 @@ def start():
 
                         saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
                     else:
-                        sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' bad result received!')
+                        sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' nothing received!')
 
         except ScrapliException as error:
             print(error)

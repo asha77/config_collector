@@ -1,0 +1,4 @@
+show running-config
+show version
+display current-configuration
+display version

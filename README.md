@@ -19,32 +19,34 @@ It created based on Scrapli python library and support it's core platforms:
 
 It use only transport ssh2 -- scrapli wrapper around ssh2-python library. 
 For using YACC you need:
-1. Install python 3.7+ (latest - best choice) and reqiured libraries
-2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (this file will remains locally)
-3. Put actual devices information into 'devices.txt' file (see below)
-4. Create file and put show commands you'd like to execute into 'commands.txt' or 'cisco_commands.txt' file (see below)
-5. Run script using:# <YAUCC_PATH>\python.exe -u -O <YAUCC_PATH>\main.py -d devices.txt -c commands.txt
+1. Install python 3.7+ (latest - best choice) and reqiured libraries.
+2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (this file will remains locally).
+3. Put actual devices information into 'devices.txt' file (see below).
+4. Change file 'commands_<your_platform>.txt' file (if required).
+5. Run script using:# <YAUCC_PATH>\python.exe -u -O <YAUCC_PATH>\main.py -d devices.txt
 6. Look at console messages for errors and progress.
 7. Get results in folder: <YAUCC_PATH>\output\cnf_<date>-<time>
+
+###File 'devices.txt'
 It is text file with records for each device:
 ```
 device platform;device IP;device username;device password;device enable password;
 ```
-
 Minimum form of a record:
 ```
 ;device IP;;;;
 ```
-In this case device platform should be autodetected by app, login and password values (if absent) should be get from .env file.
+In this case device platform should be tried to be autodetected by app, login and password values (if absent) should be get from .env file.
 Add line for each device you like to survey. File name, extension and location can be any - it passed as CLI value.
 Example of devices file included into repo: 'devices_sample.txt'
 
 ###File 'commands.txt'
-It is text file with 'show' command lines that should be executed in each device.
+Script provided with some text files with 'show' commands for supported platforms, that should be executed on each device. 
+Not all commands are relevant for any device - it is excessive and can provide errors in log. 
+For unknown or not successfully autodetected platform commands from 'default_commands.txt' can be executed.
 Minimum form of a record is one command, for example:
 ```
 show running-config
 show ver
 ```
-File name, extension and location can be any - it passed as CLI value.
-Example of commands file included into repo: 'cisco_commands.txt'
+File names, extensions and locations can be any - it passed as CLI value.

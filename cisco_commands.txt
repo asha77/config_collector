@@ -52,6 +52,7 @@ show ip arp inspection interfaces
 show ip bgp
 show ip bgp community
 show ip bgp vpnv4 all
+show bgp vpnv4 unicast all summary
 show ip bgp vpnv4 all community
 show ip bgp vpnv4 all neighbors
 show ip dhcp snooping
@@ -63,6 +64,7 @@ show ip protocols summary
 show ip rip database
 show ip vrf
 show ip vrf interfaces
+show ip route vrf *
 show l2tun
 show lldp neighbors detail
 show mpls ldp discovery
@@ -78,7 +80,10 @@ show vlan internal usage
 show vlan private-vlan
 show vlan-switch
 show power inline
-show ip route vrf *
+show platform hardware fed active fwd-asic resource tcam utilization ! Hash and TCAM
+show platform hardware fed active fwd-asic resource utilization ! SI RI DI etc (other related resources)
+show platform hardware fed active fwd-asic resource rewrite utilization ! IP Adjacency LISP adjacency  Tunnel Adjace
+show platform hardware fed active fwd-asic resource features ip-adjacency utilization ! 17x CLI combines 3 commands into one table
 show mpls interfaces detail
 show mpls forwarding
 show vpc
