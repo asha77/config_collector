@@ -1,2 +1,2 @@
 source ./venv/Scripts/activate
-python -u -O main.py -d devices.txt -c commands.txt
+python -u -O main.py -d devices.txt
