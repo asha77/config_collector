@@ -1,0 +1,78 @@
+display current-configuration all
+display version
+display device
+display device manufacture-info
+display device power
+display power
+display device temperature all
+display interface brief
+display interface description
+display interface transceiver
+display interface troubleshooting
+display transceiver
+display stp active
+display stp brief
+display stp global
+display stp bridge local
+display stp bridge root
+display port-group all
+dis eth-trunk
+display eth-trunk troubleshooting
+display eth-trunk brief
+display lacp brief
+display mac-address
+display arp all
+display arp snooping all
+display vrrp brief
+display vrrp verbose
+display ip interface brief
+display lldp neighbor
+display lldp neighbor brief
+display dhcp snooping
+display logbuffer
+display vlan
+display vlan summary
+display ip routing-table
+display ip routing-table all-routes
+display ip routing-table all-vpn-instance
+display ip routing-table all-vpn-instance statistics
+display ospf brief
+display ospf global-statistics brief
+display ospf peer
+display ospf peer brief
+display ospf interface all
+display ospf asbr-summary
+display ospf nexthop
+display ospf routing
+display bgp peer verbose
+display bgp group
+display bgp network
+display bgp routing-table
+display bgp routing-table verbose
+display bgp vpnv4 all brief
+display bgp vpnv4 all routing-table
+display bgp vpnv4 all peer
+display bgp vpnv4 all paths
+display ntp-service status
+display ntp-service trace
+display cpu-usage
+display memory-usage
+display dot1x
+display dot1x statistics
+display dhcp snooping
+display dhcp server configuration
+display dhcp relay configuration
+display dhcp relay all
+display rip
+display ripng
+display ip vpn-instance
+display ip vpn-instance interface
+display mpls ldp all
+display mpls ldp interface all
+display mpls ldp peer all
+display mpls ldp adjacency all
+display mpls interface verbose
+display mpls lsp verbose
+display m-lag troubleshooting current
+display port-security
+display radius current-status
