@@ -1,10 +1,12 @@
 display current-configuration all
 display version
+display sn
 display device
 display device manufacture-info
 display device power
 display power
 display device temperature all
+display interface
 display interface brief
 display interface description
 display interface transceiver

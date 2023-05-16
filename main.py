@@ -299,6 +299,7 @@ def get_devices_from_file(file):
                 'auth_secondary': ena_pass,
                 'channel_log': chlog,
                 "auth_strict_key": AUTH_STRICT_KEY,
+                "ssh_config_file": True,
                 "transport": TRANSPORT,
                 "timeout_socket": int(TIMEOUT_SOCKET),          # timeout for establishing socket/initial connection in seconds
                 "timeout_transport": int(TIMEOUT_TRANSPORT)    # timeout for ssh|telnet transport in seconds
@@ -349,6 +350,7 @@ def get_show_version(ip, login, passw):
         "auth_username": login,
         "auth_password": passw,
         "auth_strict_key": False,
+#        "ssh_config_file": True,
         "transport": "ssh2"
     }
 
@@ -418,31 +420,33 @@ def get_show_version(ip, login, passw):
             return '', ''
 
 
-def get_show_run(ip, login, passw):
-    my_device = {
-        "host": ip,
-        "auth_username": login,
-        "auth_password": passw,
-        "auth_strict_key": False,
-        "transport": "ssh2",
-    }
 
-    try:
-        with GenericDriver(**my_device) as conn:
-            time.sleep(0.1)
-            response1 = conn.send_command("terminal length 0", strip_prompt=False)
-            if __debug__:
-                sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
-            time.sleep(0.1)
-            response = conn.send_command("show running-config", strip_prompt=False)
-            time.sleep(0.1)
-    except ScrapliAuthenticationFailed as error:
-        sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
-        return ""
-    except ScrapliException as error:
-        sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
-        return ""
-    return response.result
+# def get_show_run(ip, login, passw):
+#     my_device = {
+#         "host": ip,
+#         "auth_username": login,
+#         "auth_password": passw,
+#         "auth_strict_key": False,
+#         "ssh_config_file": True,
+#         "transport": "ssh2",
+#     }
+#
+#     try:
+#         with GenericDriver(**my_device) as conn:
+#             time.sleep(0.1)
+#             response1 = conn.send_command("terminal length 0", strip_prompt=False)
+#             if __debug__:
+#                 sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
+#             time.sleep(0.1)
+#             response = conn.send_command("show running-config", strip_prompt=False)
+#             time.sleep(0.1)
+#     except ScrapliAuthenticationFailed as error:
+#         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
+#         return ""
+#     except ScrapliException as error:
+#         sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
+#         return ""
+#     return response.result
 
 
 def output_filter(input):
@@ -595,3 +599,38 @@ def start():
 
 if __name__ == '__main__':
     start()
+
+#
+#     my_device = {
+#         "host": ip,
+#         "auth_username": login,
+#         "auth_password": passw,
+#         "auth_strict_key": False,
+# #        "ssh_config_file": True,
+#         "transport": "ssh2"
+#     }
+#
+#     my_device = {
+#         "host": ip,
+#         "auth_username": login,
+#         "auth_password": passw,
+#         "auth_strict_key": False,
+#         "ssh_config_file": True,
+#         "transport": "ssh2",
+#     }
+#
+# dev = {
+#     'platform': device_platform,
+#     'host': str[1],
+#     'auth_username': uname,
+#     'auth_password': passw,
+#     'auth_secondary': ena_pass,
+#     'channel_log': chlog,
+#     "auth_strict_key": AUTH_STRICT_KEY,
+#     "ssh_config_file": True,
+#     "transport": TRANSPORT,
+#     "timeout_socket": int(TIMEOUT_SOCKET),  # timeout for establishing socket/initial connection in seconds
+#     "timeout_transport": int(TIMEOUT_TRANSPORT)  # timeout for ssh|telnet transport in seconds
+# }
+
+
