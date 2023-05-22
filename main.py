@@ -414,7 +414,6 @@ def get_show_version(ip, login, passw):
             return '', ''
 
 
-
 # def get_show_run(ip, login, passw):
 #     my_device = {
 #         "host": ip,
@@ -590,8 +589,7 @@ def start():
 
                         saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
                     else:
-                        sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' nothing received!')
-
+                        sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' send: ' + command + ' - nothing received!')
         except ScrapliException as error:
             print(error)
         sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
@@ -599,38 +597,3 @@ def start():
 
 if __name__ == '__main__':
     start()
-
-#
-#     my_device = {
-#         "host": ip,
-#         "auth_username": login,
-#         "auth_password": passw,
-#         "auth_strict_key": False,
-# #        "ssh_config_file": True,
-#         "transport": "ssh2"
-#     }
-#
-#     my_device = {
-#         "host": ip,
-#         "auth_username": login,
-#         "auth_password": passw,
-#         "auth_strict_key": False,
-#         "ssh_config_file": True,
-#         "transport": "ssh2",
-#     }
-#
-# dev = {
-#     'platform': device_platform,
-#     'host': str[1],
-#     'auth_username': uname,
-#     'auth_password': passw,
-#     'auth_secondary': ena_pass,
-#     'channel_log': chlog,
-#     "auth_strict_key": AUTH_STRICT_KEY,
-#     "ssh_config_file": True,
-#     "transport": TRANSPORT,
-#     "timeout_socket": int(TIMEOUT_SOCKET),  # timeout for establishing socket/initial connection in seconds
-#     "timeout_transport": int(TIMEOUT_TRANSPORT)  # timeout for ssh|telnet transport in seconds
-# }
-
-
