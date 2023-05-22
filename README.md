@@ -22,7 +22,7 @@ For using YACC you need:
 1. Install python 3.7+ (latest - best choice) and reqiured libraries.
 2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (this file will remains locally).
 3. Put actual devices information into 'devices.txt' file (see below).
-4. Change file 'commands_<your_platform>.txt' file (if required).
+4. Change file '<your_platform>_commands.txt' file (if required).
 5. Run script using:# <YAUCC_PATH>\python.exe -u -O <YAUCC_PATH>\main.py -d devices.txt
 6. Look at console messages for errors and progress.
 7. Get results in folder: <YAUCC_PATH>\output\cnf_<date>-<time>
