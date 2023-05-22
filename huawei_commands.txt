@@ -1,4 +1,4 @@
-display current-configuration all
+display current-configuration
 display version
 display sn
 display device

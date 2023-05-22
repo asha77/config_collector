@@ -47,12 +47,6 @@ platform_to_commands = {
 }
 
 
-if __debug__:
-    logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
-else:
-    logging.basicConfig(filename="scrapli.log", level=logging.INFO)
-
-
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
     resfile = open(file_name, 'a', encoding='utf-8')
@@ -350,7 +344,7 @@ def get_show_version(ip, login, passw):
         "auth_username": login,
         "auth_password": passw,
         "auth_strict_key": False,
-#        "ssh_config_file": True,
+        "ssh_config_file": True,
         "transport": "ssh2"
     }
 
@@ -523,6 +517,12 @@ def start():
     namespace = parser.parse_args()
     global curr_path
     global cnf_save_path
+
+    if __debug__:
+        logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
+    else:
+        logging.basicConfig(filename="scrapli.log", level=logging.INFO)
+
 
     if (namespace.devfile is None):
         print("Path to file with list of devices required! Key: -d <path>")
