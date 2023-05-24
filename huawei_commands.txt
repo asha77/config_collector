@@ -29,6 +29,7 @@ display vrrp brief
 display vrrp verbose
 display ip interface brief
 display lldp neighbor
+display lldp neighbor detail
 display lldp neighbor brief
 display dhcp snooping
 display logbuffer

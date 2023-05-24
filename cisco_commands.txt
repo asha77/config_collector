@@ -14,6 +14,7 @@ show ip interface brief
 show cdp neighbors
 show cdp neighbors detail
 show lldp neighbors
+show lldp neighbors detail
 show ip dhcp snooping binding
 show logging
 show spanning-tree
