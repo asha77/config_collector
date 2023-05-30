@@ -11,6 +11,12 @@ display interface brief
 display interface description
 display interface transceiver
 display interface troubleshooting
+display interface Ethernet brief
+display interface Eth-Trunk
+display interface GigabitEthernet
+display interface MEth
+display interface Vlanif
+display interface XGigabitEthernet
 display transceiver
 display stp active
 display stp brief
