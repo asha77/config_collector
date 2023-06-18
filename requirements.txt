@@ -1,1 +1,6 @@
-scrapli~=2022.7.30.post1
+pycparser~=2.21
+python-decouple~=3.8
+scrapli~=2023.1.30
+scrapli-community~=2023.1.30
+scrapli-ssh2~=2020.10.24
+ssh2-python~=1.0.0
