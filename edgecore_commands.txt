@@ -1,0 +1,7 @@
+show version
+show runningconfiguration all
+show runningconfiguration bgp
+show mac
+show arp
+show log
+show ip route

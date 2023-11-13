@@ -30,7 +30,9 @@ family_to_platform = {
     'JUNOS': 'juniper_junos',
     'EOS': 'arista_eos',
     'VRP': 'huawei_vrp',
-    'ARUBA AOS-S': 'aruba_aoscx'
+    'ARUBA AOS-S': 'aruba_aoscx',
+    'EDGECORE_SONIC': 'edgecore_sonic'
+
 }
 
 # To change if any special list of commands for special platforms
@@ -42,8 +44,8 @@ platform_to_commands = {
     'arista_eos': 'cisco_commands.txt',
     'huawei_vrp': 'huawei_commands.txt',
     'aruba_aoscx': 'hpe_aruba_commands.txt',
+    'edgecore_sonic': 'edgecore_commands.txt',
     'unknown_platform': 'default_commands.txt'
-
 }
 
 
@@ -70,51 +72,65 @@ def createparser():
     return parser
 
 
-def obtain_model(config):
+def obtain_model(vendor, config):
     '''
     Extract model number
     '''
-    match = re.search("Model\s+\wumber\s*:\s+(.*)", config)
-    if match:
-        return match.group(1).strip()
-    else:
-        match = re.search("\wisco\s+(\S+)\s+.*\s+(with)*\d+K\/\d+K\sbytes\sof\smemory.", config)
+
+    # cisco and arista a treated as the same - they are similar
+    if vendor == 'cisco':
+        match = re.search("Model\s+\wumber\s*:\s+(.*)", config)
         if match:
             return match.group(1).strip()
         else:
-            match = re.search("\s+cisco Nexus9000 (.*) Chassis", config)
+            match = re.search("\wisco\s+(\S+)\s+.*\s+(with)*\d+K\/\d+K\sbytes\sof\smemory.", config)
             if match:
-                return "N9K-"+match.group(1).strip()
+                return match.group(1).strip()
             else:
-                match = re.search("Arista vEOS", config)
+                match = re.search("\s+cisco Nexus9000 (.*) Chassis", config)
                 if match:
-                    return "Arista vEOS"
+                    return "N9K-"+match.group(1).strip()
                 else:
                     match = re.search("ROM: Bootstrap program is Linux", config)
                     if match:
                         return "Cisco IOS vRouter "
                     else:
-                        match = re.search('(Quidway|HUAWEI)\s(\S+)\s+Routing\sSwitch\S*', config)
+                        match = re.search("Arista vEOS", config)
                         if match:
-                            return 'Huawei ' +match.group(2).strip()
+                            return "Arista vEOS"
                         else:
-                            match = re.search('HUAWEI\sCE(\S+)\s+uptime\S*', config)
+                            match = re.search("Arista (\S+)", config)
                             if match:
-                                return 'Huawei CE' + match.group(1).strip()
-                            else:
-                                match = re.search('Huawei\s(\S+)\s+Router\s\S*', config)
-                                if match:
-                                    return 'Huawei ' + match.group(1).strip()
-                                else:
-                                    match = re.search('Build\sID\s+: (\S-\S).*', config)
-                                    if match:
-                                        return match.group(1).strip()
-                                    else:
-                                        match = re.search('\s*Product\sSKU\s*:\s(\S*)', config)
-                                        if match:
-                                            return match.group(1).strip()
-                                        else:
-                                            return "Not Found"
+                                return match.group(1).strip()
+
+    if vendor == 'huawei':
+        match = re.search('(Quidway|HUAWEI)\s(\S+)\s+Routing\sSwitch\S*', config)
+        if match:
+            return 'Huawei ' +match.group(2).strip()
+        else:
+            match = re.search('HUAWEI\sCE(\S+)\s+uptime\S*', config)
+            if match:
+                return 'Huawei CE' + match.group(1).strip()
+            else:
+                match = re.search('Huawei\s(\S+)\s+Router\s\S*', config)
+                if match:
+                    return 'Huawei ' + match.group(1).strip()
+
+    if vendor == 'aruba':
+        match = re.search('Build\sID\s+: (\S-\S).*', config)
+        if match:
+            return match.group(1).strip()
+        else:
+            match = re.search('\s*Product\sSKU\s*:\s(\S*)', config)
+            if match:
+                return match.group(1).strip()
+
+    if vendor == 'edgecore':
+        match = re.search('\s*HwSKU:\s(\S*)', config)
+        if match:
+            return match.group(1).strip()
+        else:
+            return "Not Found"
 
 
 def obtain_software_version(config, family):
@@ -144,6 +160,10 @@ def obtain_software_version(config, family):
             return match.group(1).strip()
     elif family == 'ARUBA AOS-S':
         match = re.search("\s*Software revision\s*:\s*(\S+)", config)
+        if match:
+            return match.group(1).strip()
+    elif family == 'Edgecore SONIC':
+        match = re.search("\s*SONiC Software Version:\s*(\S+)", config)
         if match:
             return match.group(1).strip()
     else:
@@ -182,7 +202,11 @@ def obtain_software_family(config):
                             if match:
                                 return "ARUBA AOS-S"
                             else:
-                                return "unknown_platform"
+                                match = re.search("\s*SONiC Software Version:\s*(\S+)", config)
+                                if match:
+                                    return "Edgecore SONIC"
+                                else:
+                                    return "unknown_platform"
 
 
 def obtain_hostname(config):
@@ -247,7 +271,7 @@ def get_devices_from_file(file):
             else:
                 ena_pass = AUTH_SECONDARY
 
-            showver, hname = get_show_version(str[1], uname, passw)
+            vendor, showver, hname = get_show_version(str[1], uname, passw)
 
             if((showver == '') and (hname == '')):
                 continue
@@ -255,7 +279,7 @@ def get_devices_from_file(file):
             if __debug__:
                 sendlog(cnf_save_path, "show version:\n " + showver)
 
-            device_model = obtain_model(showver)
+            device_model = obtain_model(vendor, showver)
 
             if __debug__:
                 sendlog(cnf_save_path, "Device model:\n " + device_model)
@@ -335,6 +359,13 @@ def strip_characters_from_prompt(prompt):
     prompt = prompt.replace('>', '')
     prompt = prompt.replace('[', '')
     prompt = prompt.replace(']', '')
+    prompt = prompt.replace(':', '')
+    prompt = prompt.replace('~', '')
+    prompt = prompt.replace('$', '')
+
+    if "@" in prompt:
+        prompt = prompt.split('@',1)[1]
+
     return prompt
 
 
@@ -371,6 +402,10 @@ def get_show_version(ip, login, passw):
                 response = conn.send_command("no page", strip_prompt=False)
                 vendor = 'aruba'
 
+            if '-bash: terminal: command not found' in response.result:
+#                response = conn.send_command("no page", strip_prompt=False)
+                vendor = 'edgecore'
+
             if __debug__:
                 sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response.result)
 
@@ -388,30 +423,33 @@ def get_show_version(ip, login, passw):
                 response1 = conn.send_command("show system mem", strip_prompt = False)
                 time.sleep(0.2)
                 response.result = response.result + '\n' + response1.result
+            elif vendor == 'edgecore':
+                response = conn.send_command("show version", strip_prompt = False)
+                time.sleep(0.2)
 
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
-        return '', ''
+        return '', '', ''
     except ScrapliConnectionNotOpened as error:
         sendlog(cnf_save_path, "IP: " + ip + " Connection Error " +str(error) + " - please, check device exist or online.")
-        return '', ''
+        return '', '', ''
     except ScrapliException as error:
         sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
         if hasattr(response, 'result'):
             if ((not response.result == '') and (not hname == '')):
-                return response.result, strip_characters_from_prompt(hname)
+                return vendor, response.result, strip_characters_from_prompt(hname)
             else:
-                return '', ''
+                return '', '', ''
         else:
-            return '', ''
+            return '', '', ''
     finally:
         if hasattr(response, 'result'):
             if ((not response.result == '') and (not hname == '')):
-                return response.result, strip_characters_from_prompt(hname)
+                return vendor, response.result, strip_characters_from_prompt(hname)
             else:
-                return '', ''
+                return '', '', ''
         else:
-            return '', ''
+            return '', '', ''
 
 
 # def get_show_run(ip, login, passw):
