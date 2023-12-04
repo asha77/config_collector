@@ -1,7 +1,16 @@
 show version
 show runningconfiguration all
 show runningconfiguration bgp
+sudo show system-health detail
+sudo bridge fdb show
+show vxlan evpn es
+ip -s nei
+sudo arp -n
 show mac
-show arp
 show log
-show ip route
+show ip route vrf all
+bcmcmd "l3 egress show"
+bcmcmd 'l3 info'
+bcmcmd l2 "l2 show"
+bcmcmd "l3 defip show"
+bcmcmd "l3 l3table show"
