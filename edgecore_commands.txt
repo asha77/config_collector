@@ -14,3 +14,5 @@ bcmcmd 'l3 info'
 bcmcmd l2 "l2 show"
 bcmcmd "l3 defip show"
 bcmcmd "l3 l3table show"
+vtysh -c 'show evpn mac vni all'
+vtysh -c 'show evpn arp-cache vni all'
