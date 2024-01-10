@@ -17,7 +17,7 @@ It created based on Scrapli python library and support it's core platforms:
 
 ** More platforms from Scraply-community will be added later.
 
-It use only transport ssh2 -- scrapli wrapper around ssh2-python library. 
+It use transport ssh2 -- scrapli wrapper around ssh2-python library. 
 For using YACC you need:
 1. Install python 3.7+ (latest - best choice) and reqiured libraries.
 2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (this file will remains locally).
@@ -37,6 +37,7 @@ Minimum form of a record:
 ```
 ;device IP;;;;
 ```
+
 In this case device platform should be tried to be autodetected by app, login and password values (if absent) should be get from .env file.
 Add line for each device you like to survey. File name, extension and location can be any - it passed as CLI value.
 Example of devices file included into repo: 'devices_sample.txt'

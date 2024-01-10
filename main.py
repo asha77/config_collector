@@ -5,9 +5,9 @@ import argparse
 from datetime import datetime
 import os
 from scrapli.driver import GenericDriver
+import time
 import re
 import logging
-import time
 
 
 AUTH_USERNAME = config('AUTH_USERNAME')
@@ -21,6 +21,7 @@ TRANSPORT = config('TRANSPORT')
 TIMEOUT_SOCKET = config('TIMEOUT_SOCKET')
 TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
+
 
 family_to_platform = {
     'IOS': 'cisco_iosxe',
@@ -48,6 +49,12 @@ platform_to_commands = {
     'unknown_platform': 'default_commands.txt'
 }
 
+# filters description - lines according to these regulars are NOT save into file. Can be expanded.
+edgecore_excluded_errors = [
+    '/usr/local/lib/python3.7/dist-packages/ax_interface/mib.py',
+    '/usr/local/lib/python3.7/dist-packages/sonic_ax_impl/mibs/ietf/rfc1213.py'
+]
+
 
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
@@ -65,9 +72,18 @@ def saveoutfile(path, ip, message):
     resfile.close()
 
 
+def rewrite_out_file(path, ip, message):
+    file_name = os.path.join(path, ip+'.log')
+    resfile = open(file_name, "w", encoding='utf-8')
+    resfile.write(message)
+    resfile.close()
+
+
+
 def createparser():
     parser = argparse.ArgumentParser(prog='YAUCC - Yet Another Universal Config Collector', description='Python app for executing commands on network equipment using SSH', epilog='author: asha77@gmail.com')
     parser.add_argument('-d', '--devfile', required=True, help='Specify file with set of devices')
+    parser.add_argument('-o', '--overwrite', required=False, action='store_true', help='Specify to save and overwrite files into the same folder e.g. \"output\" folder')
 #    parser.add_argument('-c', '--comfiles', required=True, help='Specify file with set of commands')
     return parser
 
@@ -452,95 +468,75 @@ def get_show_version(ip, login, passw):
             return '', '', ''
 
 
-# def get_show_run(ip, login, passw):
-#     my_device = {
-#         "host": ip,
-#         "auth_username": login,
-#         "auth_password": passw,
-#         "auth_strict_key": False,
-#         "ssh_config_file": True,
-#         "transport": "ssh2",
-#     }
-#
-#     try:
-#         with GenericDriver(**my_device) as conn:
-#             time.sleep(0.1)
-#             response1 = conn.send_command("terminal length 0", strip_prompt=False)
-#             if __debug__:
-#                 sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response1.result)
-#             time.sleep(0.1)
-#             response = conn.send_command("show running-config", strip_prompt=False)
-#             time.sleep(0.1)
-#     except ScrapliAuthenticationFailed as error:
-#         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
-#         return ""
-#     except ScrapliException as error:
-#         sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
-#         return ""
-#     return response.result
-
-
 def output_filter(input):
     '''
-    Output data obfuscation:
+    Output data obfuscation and filtering:
     radius-server key XXXX
     snmp-server community XXX RX
     tacacs server server
         key 6 ХХХ
     '''
 
-    lines = []
     lines = input.split('\n')
+    lines_out = []
 
-    for i in range(len(lines)):
-        match = re.search("radius-server key (.*)", lines[i])
+    for line in lines:
+        match = re.search("radius-server key (.*)", line)
         if match:
-            lines[i] = "radius-server key ХХХ"
+            lines_out.append("radius-server key ХХХ")
         else:
-            match = re.search("snmp-server community (.*) RO", lines[i])
+            match = re.search("snmp-server community (.*) RO", line)
             if match:
-                lines[i] = "snmp-server community XXX RO"
+                lines_out.append("snmp-server community XXX RO")
             else:
-                match = re.search("snmp-server community (.*) RW", lines[i])
+                match = re.search("snmp-server community (.*) RW", line)
                 if match:
-                    lines[i] = "snmp-server community XXX RW"
+                    lines_out = "snmp-server community XXX RW"
                 else:
-                    match = re.search("\skey (\d) (.*)", lines[i])
+                    match = re.search("\skey (\d) (.*)", line)
                     if match:
-                        lines[i] = " key " + match.group(1).strip() + " XXX"
+                        lines_out.append(" key " + match.group(1).strip() + " XXX")
                     else:
-                        match = re.search("username (\w+) privilege (\d+) password (.*)", lines[i])
+                        match = re.search("username (\w+) privilege (\d+) password (.*)", line)
                         if match:
-                            lines[i] = "username XXX priviledge " + match.group(2).strip() + " password XXX"
+                            lines_out.append("username XXX priviledge " + match.group(2).strip() + " password XXX")
                         else:
-                            match = re.search("enable secret (\d) (.*)", lines[i])
+                            match = re.search("enable secret (\d) (.*)", line)
                             if match:
-                                lines[i] = "enable secret " + match.group(1).strip() + " XXX"
+                                lines_out.append("enable secret " + match.group(1).strip() + " XXX")
                             else:
-                                match = re.search("radius server shared-key(.*)", lines[i])
+                                match = re.search("radius server shared-key(.*)", line)
                                 if match:
-                                    lines[i] = "radius server shared-key cipher XXX"
+                                    lines_out.append("radius server shared-key cipher XXX")
                                 else:
-                                    match = re.search("\s*local-user(.*)", lines[i])
+                                    match = re.search("\s*local-user(.*)", line)
                                     if match:
-                                        lines[i] = " local-user XXX"
+                                        lines_out.append(" local-user XXX")
                                     else:
-                                        match = re.search("\s*ospf authentication(.*)", lines[i])
+                                        match = re.search("\s*ospf authentication(.*)", line)
                                         if match:
-                                            lines[i] = " ospf authentication XXX"
+                                            lines_out.append(" ospf authentication XXX")
                                         else:
-                                            match = re.search("\s*(.*)\scipher(.*)", lines[i])
+                                            match = re.search("\s*(.*)\scipher(.*)", line)
                                             if match:
-                                                lines[i] = ' ' +  match.group(1).strip() + ' cipher XXX'
+                                                lines_out.append(' ' +  match.group(1).strip() + ' cipher XXX')
                                             else:
-                                                match = re.search("\s*pre-shared-key(.*)", lines[i])
+                                                match = re.search("\s*pre-shared-key(.*)", line)
                                                 if match:
-                                                    lines[i] = " pre-shared-key XXX"
+                                                    lines_out.append(" pre-shared-key XXX")
                                                 else:
-                                                    match = re.search("\s*ssh user\s(\w+)(.*)", lines[i])
+                                                    match = re.search("\s*ssh user\s(\w+)(.*)", line)
                                                     if match:
-                                                        lines[i] = " ssh user XXX " + match.group(2).strip()
-    return '\n'.join(map(str, lines))
+                                                        lines_out.append(" ssh user XXX " + match.group(2).strip())
+                                                    else:
+                                                        matched = False
+                                                        for error_regexp in edgecore_excluded_errors:
+                                                            match = re.search(error_regexp, line)
+                                                            if match:
+                                                                matched = True
+                                                        if matched == False:
+                                                            lines_out.append(line)
+    return '\n'.join(map(str, lines_out))
 
 
 def get_hostname_by_ip(ip, hostnames):
@@ -552,6 +548,8 @@ def get_hostname_by_ip(ip, hostnames):
 def start():
     parser = createparser()
     namespace = parser.parse_args()
+    overwrite = False
+
     global curr_path
     global cnf_save_path
 
@@ -569,6 +567,11 @@ def start():
 #        print("Path to file with list of commands required! Key: -с <path>")
 #        exit()
 
+    if (namespace.overwrite is not None):
+        print("Files will be overwritten - you'll find just last result in \"output\" folder")
+        overwrite = True
+
+
     startTime = datetime.now()
 
     date = str(startTime.date()) + "-" + str(startTime.strftime("%H-%M-%S"))
@@ -584,9 +587,11 @@ def start():
 
     cnf_save_path = os.path.join(curr_path,'output')
     os.chdir(cnf_save_path)
-    os.mkdir("cnf_"+date)
-    cnf_save_path = os.path.join(cnf_save_path,"cnf_"+date)
-    os.chdir(cnf_save_path)
+
+    if overwrite == False:
+        os.mkdir("cnf_"+date)
+        cnf_save_path = os.path.join(cnf_save_path,"cnf_"+date)
+        os.chdir(cnf_save_path)
 
     sendlog(cnf_save_path, "Starting at "+date)
     sendlog(cnf_save_path, "Config save folder is: " + str(cnf_save_path))
@@ -605,6 +610,10 @@ def start():
         sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device, timeout_ops=180) as ssh:
+
+                if overwrite == True:
+                    rewrite_out_file(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "Data collected: " + date + "\n")
+
                 for command in commands:
                     if __debug__:
                         sendlog(cnf_save_path, device['host'] + " send command: " + command)
