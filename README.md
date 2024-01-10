@@ -4,7 +4,7 @@ This python 3.7 - 3.9 app be used for network survey, or any other operation or 
 It can:
 - connect using SSHv2 to number of network devices
 - execute series of show commands on network  devices 
-- write output of executed commands into files in one folder 
+- write output of executed commands into files 
 
 ## WARNING!!! YAUCC not tested for configuration commands, but there are no any special restrictions for them.
 
@@ -17,7 +17,7 @@ It created based on Scrapli python library and support it's core platforms:
 
 ** More platforms from Scraply-community will be added later.
 
-It use only transport ssh2 -- scrapli wrapper around ssh2-python library. 
+It use transport ssh2 -- scrapli wrapper around ssh2-python library. 
 For using YACC you need:
 1. Install python 3.7+ (latest - best choice) and reqiured libraries.
 2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (this file will remains locally).
@@ -37,10 +37,15 @@ Minimum form of a record:
 ```
 ;device IP;;;;
 ```
+
 In this case device platform should be tried to be autodetected by app, login and password values (if absent) should be get from .env file.
 Add line for each device you like to survey. File name, extension and location can be any - it passed as CLI value.
 Example of devices file included into repo: 'devices_sample.txt'
 File names, extension and location can be any - it is passed as CLI value.
+
+## Options
+    -d or --devfile [ file_with_list_of_devices ]   - path to file with list of network network devices 
+    -o or --overwrite                               - save results into 'output' folder rewriting previous results each time 
 
 Script provided with set of files with lists of 'show' commands for supported platforms. These commands should be executed on each device. 
 These lists are excessive (not all commands are relevant for any device) and can produce errors in log. 
