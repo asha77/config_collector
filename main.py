@@ -8,7 +8,6 @@ from scrapli.driver import GenericDriver
 import time
 import re
 import logging
-from scrapli_scp import AsyncSrapliSCP
 
 
 AUTH_USERNAME = config('AUTH_USERNAME')
