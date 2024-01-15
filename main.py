@@ -66,14 +66,14 @@ def sendlog(path, message):
 
 
 def saveoutfile(path, ip, message):
-    file_name = os.path.join(path, ip+'.log')
+    file_name = os.path.join(path, ip)
     resfile = open(file_name, "a", encoding='utf-8')
     resfile.write(message)
     resfile.close()
 
 
-def rewrite_out_file(path, ip, message):
-    file_name = os.path.join(path, ip+'.log')
+def rewriteoutfile(path, ip, message):
+    file_name = os.path.join(path, ip)
     resfile = open(file_name, "w", encoding='utf-8')
     resfile.write(message)
     resfile.close()
@@ -84,6 +84,7 @@ def createparser():
     parser = argparse.ArgumentParser(prog='YAUCC - Yet Another Universal Config Collector', description='Python app for executing commands on network equipment using SSH', epilog='author: asha77@gmail.com')
     parser.add_argument('-d', '--devfile', required=True, help='Specify file with set of devices')
     parser.add_argument('-o', '--overwrite', required=False, action='store_true', help='Specify to save and overwrite files into the same folder e.g. \"output\" folder')
+    parser.add_argument('-b', '--backup_configs', required=False, action='store_true', help='Specify to save and overwrite separately config files into \"config\" folder')
 #    parser.add_argument('-c', '--comfiles', required=True, help='Specify file with set of commands')
     return parser
 
@@ -317,7 +318,7 @@ def get_devices_from_file(file):
             else:
                 sendlog(cnf_save_path, "IP: " + str[1] + " Device and platform not recognized.")
                 if showver:
-                    saveoutfile(cnf_save_path, str[1] + "_" + hname, "\n" + showver)
+                    saveoutfile(cnf_save_path, str[1] + "_" + hname + '.log', "\n" + showver)
                 continue
 
             if __debug__:
@@ -539,6 +540,36 @@ def output_filter(input):
     return '\n'.join(map(str, lines_out))
 
 
+def output_config_files_filter(input):
+    '''
+    Filter unnecessary lines
+
+   Building configuration...
+   Current configuration:
+   !
+   end
+    '''
+
+    lines = input.split('\n')
+    lines_out = []
+
+    for line in lines:
+        match = re.search("Building configuration...", line)
+        if not match:
+            match = re.search("Current configuration:", line)
+            if not match:
+                if not line == '':
+                    match = re.search("end", line)
+                    if not match:
+                        lines_out.append(line)
+
+    if lines_out[0] == '!':
+        lines_out.pop(0)
+
+    return '\n'.join(map(str, lines_out))
+
+
+
 def get_hostname_by_ip(ip, hostnames):
     for record in hostnames:
         if record["ip"] == ip:
@@ -567,13 +598,19 @@ def start():
 #        print("Path to file with list of commands required! Key: -с <path>")
 #        exit()
 
-    if (namespace.overwrite is not None):
+    if (namespace.overwrite):
         print("Files will be overwritten - you'll find just last result in \"output\" folder")
         overwrite = True
+    else:
+        overwrite = False
 
+    if (namespace.backup_configs):
+        print("Config files will be collected and overwritten - you'll find result in \"configs\" folder")
+        save_backups = True
+    else:
+        save_backups = False
 
     startTime = datetime.now()
-
     date = str(startTime.date()) + "-" + str(startTime.strftime("%H-%M-%S"))
 
     if not WORKING_DIRECTORY:
@@ -585,7 +622,11 @@ def start():
     if not os.path.isdir("output"):
         os.mkdir("output")
 
+    if not os.path.isdir("configs"):
+        os.mkdir("configs")
+
     cnf_save_path = os.path.join(curr_path,'output')
+    backups_save_path = os.path.join(curr_path,'configs')
     os.chdir(cnf_save_path)
 
     if overwrite == False:
@@ -612,7 +653,7 @@ def start():
             with Scrapli(**device, timeout_ops=180) as ssh:
 
                 if overwrite == True:
-                    rewrite_out_file(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "Data collected: " + date + "\n")
+                    rewriteoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames) + '.log', "Data collected: " + date + "\n")
 
                 for command in commands:
                     if __debug__:
@@ -634,12 +675,41 @@ def start():
                                 ln = 20
                                 sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' received: ' + filtered_result[0:ln-1].replace('\n', ' ') + ' ...')
 
-                        saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames), "\n" + "# " + command +"\n" + filtered_result + "\n")
+                        saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames) + '.log', "\n" + "# " + command +"\n" + filtered_result + "\n")
                     else:
                         sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' send: ' + command + ' - nothing received!')
         except ScrapliException as error:
             print(error)
         sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
+
+    # separatele save and rewrite configuration backups into 'config' folder
+    if save_backups:
+        os.chdir(backups_save_path)
+        for device in devices:
+            sendlog(cnf_save_path, "Starting collection of configs from {}".format(device['host']))
+            try:
+                with Scrapli(**device, timeout_ops=180) as ssh:
+                    if device['platform'] == 'edgecore_sonic':
+                        time.sleep(0.2)
+                        reply = ssh.send_command('show runningconfiguration all')
+                        time.sleep(0.2)
+
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        rewriteoutfile(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_config_db.json', output_config_files_filter(reply.result))
+
+                        time.sleep(0.2)
+                        reply = ssh.send_command('show runningconfiguration bgp')
+                        time.sleep(0.2)
+
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        rewriteoutfile(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_frr.conf', output_config_files_filter(reply.result))
+
+            except ScrapliException as error:
+                print(error)
 
 
 if __name__ == '__main__':

@@ -9,6 +9,7 @@ sudo arp -n
 show mac
 show log
 docker ps
+docker ps -a
 docker system info
 show ip route vrf all
 bcmcmd "l3 egress show"
@@ -18,3 +19,4 @@ bcmcmd "l3 defip show"
 bcmcmd "l3 l3table show"
 vtysh -c "show evpn mac vni all"
 vtysh -c "show evpn arp-cache vni all"
+swssloglevel -p
