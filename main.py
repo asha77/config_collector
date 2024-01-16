@@ -33,7 +33,6 @@ family_to_platform = {
     'VRP': 'huawei_vrp',
     'ARUBA AOS-S': 'aruba_aoscx',
     'EDGECORE_SONIC': 'edgecore_sonic'
-
 }
 
 # To change if any special list of commands for special platforms
