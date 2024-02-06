@@ -84,7 +84,7 @@ def createparser():
     parser.add_argument('-d', '--devfile', required=True, help='Specify file with set of devices')
     parser.add_argument('-o', '--overwrite', required=False, action='store_true', help='Specify to save and overwrite files into the same folder e.g. \"output\" folder')
     parser.add_argument('-b', '--backup_configs', required=False, action='store_true', help='Specify to save and overwrite separately config files into \"config\" folder')
-#    parser.add_argument('-c', '--comfiles', required=True, help='Specify file with set of commands')
+
     return parser
 
 
@@ -258,6 +258,9 @@ def get_devices_from_file(file):
     with open(file) as f:
         for line in f.readlines():
             str = line.split(";")
+
+            if str == ['\n'] or str == [' \n']:
+                continue
 
             if len(str) < 2:
                 print('Error - wrong devices file format')
@@ -624,8 +627,8 @@ def start():
     if not os.path.isdir("configs"):
         os.mkdir("configs")
 
-    cnf_save_path = os.path.join(curr_path,'output')
-    backups_save_path = os.path.join(curr_path,'configs')
+    cnf_save_path = os.path.join(curr_path, 'output')
+    backups_save_path = os.path.join(curr_path, 'configs')
     os.chdir(cnf_save_path)
 
     if overwrite == False:
