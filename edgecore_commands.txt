@@ -12,6 +12,7 @@ docker ps
 docker ps -a
 docker system info
 show ip route vrf all
+show auto-techsupport history
 vtysh -c "show ip route vrf all"
 bcmcmd "l3 egress show"
 bcmcmd "l3 info"
