@@ -78,13 +78,12 @@ def rewriteoutfile(path, ip, message):
     resfile.close()
 
 
-
 def createparser():
     parser = argparse.ArgumentParser(prog='YAUCC - Yet Another Universal Config Collector', description='Python app for executing commands on network equipment using SSH', epilog='author: asha77@gmail.com')
-    parser.add_argument('-d', '--devfile', required=True, help='Specify file with set of devices')
+    parser.add_argument('-d', '--devfile', dest="devices", required=True, help='Specify file with set of devices')
+    parser.add_argument('-c', '--comfiles', dest="commands",  required=False, help='Specify file with commands to be executed (cancels autodetection of command set according to device platform)')
     parser.add_argument('-o', '--overwrite', required=False, action='store_true', help='Specify to save and overwrite files into the same folder e.g. \"output\" folder')
     parser.add_argument('-b', '--backup_configs', required=False, action='store_true', help='Specify to save and overwrite separately config files into \"config\" folder')
-
     return parser
 
 
@@ -582,6 +581,7 @@ def start():
     parser = createparser()
     namespace = parser.parse_args()
     overwrite = False
+    commfile_path_specified = False
 
     global curr_path
     global cnf_save_path
@@ -592,13 +592,14 @@ def start():
         logging.basicConfig(filename="scrapli.log", level=logging.INFO)
 
 
-    if (namespace.devfile is None):
+    if (namespace.devices is None):
         print("Path to file with list of devices required! Key: -d <path>")
         exit()
 
-#    if (namespace.comfiles is None):
-#        print("Path to file with list of commands required! Key: -с <path>")
-#        exit()
+
+    if (namespace.commands is not None):
+        print("Path to file with commands specified")
+        commfile_path_specified = True
 
     if (namespace.overwrite):
         print("Files will be overwritten - you'll find just last result in \"output\" folder")
@@ -640,7 +641,7 @@ def start():
     sendlog(cnf_save_path, "Config save folder is: " + str(cnf_save_path))
 
     # Get list of available device files
-    devices, hostnames = get_devices_from_file(os.path.join(curr_path, namespace.devfile))
+    devices, hostnames = get_devices_from_file(os.path.join(curr_path, namespace.devices))
 
     sendlog(cnf_save_path, str(len(devices)) + " devices loaded")
 #    sendlog(cnf_save_path, str(len(commands)) + " commands loaded")
@@ -649,7 +650,11 @@ def start():
     for device in devices:
         devStartTime = datetime.now()
 
-        commands = get_commands_from_file(os.path.join(curr_path, platform_to_commands[device['platform']]))
+        if commfile_path_specified:
+            commands = get_commands_from_file(os.path.join(curr_path, namespace.commands))
+        else:
+            commands = get_commands_from_file(os.path.join(curr_path, platform_to_commands[device['platform']]))
+
         sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device, timeout_ops=180) as ssh:

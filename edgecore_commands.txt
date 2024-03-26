@@ -1,4 +1,5 @@
 show version
+show lldp table
 show runningconfiguration all
 show runningconfiguration bgp
 sudo show system-health detail
@@ -22,3 +23,9 @@ bcmcmd "l3 l3table show"
 vtysh -c "show evpn mac vni all"
 vtysh -c "show evpn arp-cache vni all"
 swssloglevel -p
+top -o %MEM -b -n 1 -e m  -c
+vtysh -c "show memory zebra"
+vtysh -c "show zebra dplane detailed"
+vtysh -c "show zebra dplane providers detailed"
+vtysh -c "show thread cpu"
+vtysh -c "show memory"
