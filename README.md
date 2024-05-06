@@ -9,11 +9,15 @@ It can:
 ## WARNING!!! YAUCC not tested for configuration commands, but there are no any special restrictions for them.
 
 It created based on Scrapli python library and support it's core platforms:
+- Cisco IOS - cisco_iosxe
 - Cisco IOS-XE - cisco_iosxe
 - Cisco NX-OS - cisco_nxos
 - Cisco IOS-XR - cisco_iosxr
 - Arista EOS - arista_eos
+- Huawei VRP - huawei_vrp
 - Juniper JunOS - juniper_junos
+- Edgecore Sonic - edgecore_sonic
+- ARUBA AOS-S - aruba_aoscx
 
 ** More platforms from Scraply-community will be added later.
 
