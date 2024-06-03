@@ -22,6 +22,7 @@ bcmcmd "l3 defip show"
 bcmcmd "l3 l3table show"
 vtysh -c "show evpn mac vni all"
 vtysh -c "show evpn arp-cache vni all"
+vtysh -c "show bgp l2vpn evpn"
 swssloglevel -p
 top -o %MEM -b -n 1 -e m  -c
 vtysh -c "show memory zebra"
