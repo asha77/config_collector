@@ -35,6 +35,7 @@ family_to_platform = {
     'Edgecore SONIC': 'edgecore_sonic'
 }
 
+
 # To change if any special list of commands for special platforms
 platform_to_commands = {
     'cisco_iosxe': 'cisco_commands.txt',
