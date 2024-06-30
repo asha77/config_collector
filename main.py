@@ -350,7 +350,7 @@ def get_devices_from_file(file):
 
             hostnames.append(hn)
 
-    return(devices, hostnames)
+    return devices, hostnames
 
 
 def get_commands_from_file(file):
@@ -359,7 +359,7 @@ def get_commands_from_file(file):
         for line in f.readlines():
             if line.find('#') == -1:
                 commands.append(line.strip('\n'))
-    return(commands)
+    return commands
 
 '''
 def send_show(device, show_command):
