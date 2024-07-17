@@ -26,7 +26,7 @@ WORKING_DIRECTORY = config('WORKING_DIRECTORY')
 family_to_platform = {
     'IOS': 'cisco_iosxe',
     'IOS XE': 'cisco_iosxe',
-    'Nexus': 'cisco_nxos',
+    'NX-OS': 'cisco_nxos',
     'IOS XR': 'cisco_iosxr',
     'JUNOS': 'juniper_junos',
     'EOS': 'arista_eos',
