@@ -118,6 +118,8 @@ def obtain_model(vendor, config):
                             match = re.search("Arista (\S+)", config)
                             if match:
                                 return match.group(1).strip()
+                            else:
+                                return "Not_found"
 
     if vendor == 'huawei':
         match = re.search('(Quidway|HUAWEI)\s(\S+)\s+Routing\sSwitch\S*', config)
@@ -131,6 +133,8 @@ def obtain_model(vendor, config):
                 match = re.search('Huawei\s(\S+)\s+Router\s\S*', config)
                 if match:
                     return 'Huawei ' + match.group(1).strip()
+                else:
+                    return "Not_found"
 
     if vendor == 'aruba':
         match = re.search('Build\sID\s+: (\S-\S).*', config)
@@ -140,14 +144,17 @@ def obtain_model(vendor, config):
             match = re.search('\s*Product\sSKU\s*:\s(\S*)', config)
             if match:
                 return match.group(1).strip()
+            else:
+                return "Not_found"
 
     if vendor == 'edgecore':
         match = re.search('\s*HwSKU:\s(\S*)', config)
         if match:
             return match.group(1).strip()
         else:
-            return "Not Found"
+            return "Not_found"
 
+    return "Model_vendor_not_found"
 
 def obtain_software_version(config, family):
     '''
