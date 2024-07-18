@@ -173,6 +173,10 @@ def obtain_software_version(config, family):
         match = re.search("\s*NXOS: version (.*)", config)
         if match:
             return match.group(1).strip()
+        else:
+            match = re.search("\s*system:\s+version\s*(.*)", config)
+            if match:
+                return match.group(1).strip()
     elif family == 'EOS':
         match = re.search("Software image version: (.*)", config)
         if match:
@@ -191,6 +195,7 @@ def obtain_software_version(config, family):
             return match.group(1).strip()
     else:
         return "Not Found"
+    return "Soft_not_found"
 
 
 def obtain_software_family(config):
