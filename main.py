@@ -21,6 +21,7 @@ TRANSPORT = config('TRANSPORT')
 TIMEOUT_SOCKET = config('TIMEOUT_SOCKET')
 TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
+BACKUP_CONFIG_FOLDER = config('BACKUP_CONFIG_FOLDER')
 
 
 family_to_platform = {
@@ -156,6 +157,7 @@ def obtain_model(vendor, config):
 
     return "Model_vendor_not_found"
 
+
 def obtain_software_version(config, family):
     '''
     Extract software version
@@ -269,10 +271,13 @@ def get_devices_from_file(file):
     hostnames = []
     with open(file) as f:
         for line in f.readlines():
-            str = line.split(";")
-
-            if str == ['\n'] or str == [' \n']:
+            if line[0] == '#':
                 continue
+
+            if line == ['\n'] or line == [' \n']:
+                continue
+
+            str = line.split(";")
 
             if len(str) < 2:
                 print('Error - wrong devices file format')
@@ -637,12 +642,18 @@ def start():
     os.chdir(curr_path)
     if not os.path.isdir("output"):
         os.mkdir("output")
-
-    if not os.path.isdir("configs"):
-        os.mkdir("configs")
-
     cnf_save_path = os.path.join(curr_path, 'output')
-    backups_save_path = os.path.join(curr_path, 'configs')
+
+
+    if BACKUP_CONFIG_FOLDER == '':
+        backups_save_path = os.path.join(curr_path, 'configs')
+        if not os.path.isdir("configs"):
+            os.mkdir("configs")
+    else:
+        backups_save_path = BACKUP_CONFIG_FOLDER
+        if not os.path.isdir(backups_save_path):
+            os.mkdir(backups_save_path)
+
     os.chdir(cnf_save_path)
 
     if overwrite == False:
