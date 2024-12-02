@@ -3,9 +3,13 @@ show version
 show inventory
 show module
 show interfaces status
+show interface status
 show interfaces description
+show interface description
 show interfaces switchport
+show interface switchport
 show interfaces trunk
+show interface trunk
 show mac address-table
 show ip arp
 show vrrp
@@ -21,10 +25,11 @@ show spanning-tree
 show spanning-tree bridge
 show spanning-tree active
 show switch detail
-show env all
+show environment
 show etherchannel summary
 show port-channel summary
 show interfaces transceiver
+show interface transceiver
 show vlan
 show vtp status
 show protocols
@@ -40,11 +45,14 @@ show ip ospf database router self-originate
 show ip ospf database external self-originate
 show ip bgp summary
 show ip bgp vpnv4 all summary
+show bgp vrf ALL_VRFS_012345678901234 summary
+show bgp all summary
 show ntp status
 show ntp associations
 show ntp peer-status
-show processes cpu sorted
-show processes memory sorted
+show processes cpu sort
+show processes cpu history
+show processes memory
 show dot1x all
 show etherchannel protocol
 show ip arp
@@ -52,10 +60,14 @@ show ip arp inspection
 show ip arp inspection interfaces
 show ip bgp
 show ip bgp community
+show bgp community
 show ip bgp vpnv4 all
+show bgp all
+show bgp vrf all
 show bgp vpnv4 unicast all summary
 show ip bgp vpnv4 all community
 show ip bgp vpnv4 all neighbors
+show bgp all neighbors
 show ip dhcp snooping
 show ip ospf
 show ip ospf database
@@ -65,7 +77,11 @@ show ip protocols summary
 show ip rip database
 show ip vrf
 show ip vrf interfaces
+show vrf all
+show ip interface brief vrf all
 show ip route vrf *
+show ip route vrf vrf-all
+show ip route vrf all
 show l2tun
 show lldp neighbors detail
 show mpls ldp discovery
