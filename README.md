@@ -24,7 +24,20 @@ It created based on Scrapli python library and support it's core platforms:
 It use transport ssh2 -- scrapli wrapper around ssh2-python library. 
 For using YACC you need:
 1. Install python 3.7+ (latest - best choice) and reqiured libraries.
-2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (this file will remains locally).
+2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (file '.env' will remains locally).
+```
+AUTH_USERNAME=<username>
+AUTH_PASSWORD=<password>
+AUTH_SECONDARY=<enable password>
+AUTH_STRICT_KEY=False
+TRANSPORT=sshv2
+TIMEOUT_SOCKET=5
+TIMEOUT_TRANSPORT=10
+WORKING_DIRECTORY=
+BACKUP_CONFIG_FOLDER='Path to store backups'
+```
+Любые пробелы, табуляция после '=' или значений ключей должны отсутствовать.
+
 3. Put actual devices information into 'devices.txt' file (see below).
 4. Change file '<your_platform>_commands.txt' file (if required).
 5. Run script using:# <YAUCC_PATH>\python.exe -u -O <YAUCC_PATH>\main.py -d devices.txt

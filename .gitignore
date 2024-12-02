@@ -1,9 +1,10 @@
 /.env
 output
 **/output
+**/configs
 **/venv
 /logfile.log
 /scrapli.log
 /devices.txt
 /commands.txt
-/.env
+/devices_*.txt
