@@ -644,7 +644,6 @@ def start():
         os.mkdir("output")
     cnf_save_path = os.path.join(curr_path, 'output')
 
-
     if BACKUP_CONFIG_FOLDER == '':
         backups_save_path = os.path.join(curr_path, 'configs')
         if not os.path.isdir("configs"):
@@ -713,7 +712,7 @@ def start():
             print(error)
         sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
 
-    # separatele save and rewrite configuration backups into 'config' folder
+    # separately get configuration and save them into 'config' folder for backup
     if save_backups:
         os.chdir(backups_save_path)
         for device in devices:
