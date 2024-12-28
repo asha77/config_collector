@@ -2,16 +2,12 @@ show version
 show lldp table
 show runningconfiguration all
 show runningconfiguration bgp
-sudo show system-health detail
 sudo bridge fdb show
 show vxlan evpn es
 ip -s nei
 sudo arp -n
 show mac
-show log
-docker ps
 docker ps -a
-docker system info
 show auto-techsupport history
 bcmcmd "l3 egress show"
 bcmcmd "l3 info"
@@ -25,3 +21,6 @@ vtysh -c "show bgp l2vpn evpn"
 vtysh -c "show logging"
 vtysh -c "show bgp summary"
 swssloglevel -p
+sudo show system-health detail
+docker system info
+show log
