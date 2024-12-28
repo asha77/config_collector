@@ -22,4 +22,5 @@ vtysh -c "show ip route vrf all"
 vtysh -c "show evpn mac vni all"
 vtysh -c "show evpn arp-cache vni all"
 vtysh -c "show bgp l2vpn evpn"
+vtysh -c "show logging"
 swssloglevel -p
