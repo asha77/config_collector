@@ -22,6 +22,11 @@ TIMEOUT_SOCKET = config('TIMEOUT_SOCKET')
 TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
 BACKUP_CONFIG_FOLDER = config('BACKUP_CONFIG_FOLDER')
+try:
+    OUTPUT_FOLDER = config('OUTPUT_FOLDER')
+except:
+    print("          ... it seems that no \"OUTPUT_FOLDER\" parameter specified in .env file - using by-default values...")
+    OUTPUT_FOLDER = ''
 
 
 family_to_platform = {
@@ -616,17 +621,17 @@ def start():
 
 
     if (namespace.commands is not None):
-        print("Path to file with commands specified")
+        print("          ... path to file with commands specified")
         commfile_path_specified = True
 
     if (namespace.overwrite):
-        print("Files will be overwritten - you'll find just last result in \"output\" folder")
+        print("          ... files will be overwritten - you'll find just last result in \"output\" folder")
         overwrite = True
     else:
         overwrite = False
 
     if (namespace.backup_configs):
-        print("Config files will be collected and overwritten - you'll find result in \"configs\" folder")
+        print("          ... config files will be collected and overwritten - you'll find result in \"configs\" folder")
         save_backups = True
     else:
         save_backups = False
@@ -639,10 +644,23 @@ def start():
     else:
         curr_path = WORKING_DIRECTORY
 
-    os.chdir(curr_path)
-    if not os.path.isdir("output"):
-        os.mkdir("output")
-    cnf_save_path = os.path.join(curr_path, 'output')
+    if OUTPUT_FOLDER == '':
+        print("          ... no output folder specified in .env file - result should be saved in \"output\" folder")
+        os.chdir(curr_path)
+        if not os.path.isdir("output"):
+            os.mkdir("output")
+        cnf_save_path = os.path.join(curr_path, 'output')
+    else:
+        cnf_save_path = OUTPUT_FOLDER
+        if not os.path.isdir(cnf_save_path):
+            os.mkdir(cnf_save_path)
+
+    os.chdir(cnf_save_path)
+
+    if overwrite == False:
+        os.mkdir("cnf_"+date)
+        cnf_save_path = os.path.join(cnf_save_path,"cnf_"+date)
+        os.chdir(cnf_save_path)
 
     if BACKUP_CONFIG_FOLDER == '':
         backups_save_path = os.path.join(curr_path, 'configs')
@@ -653,13 +671,7 @@ def start():
         if not os.path.isdir(backups_save_path):
             os.mkdir(backups_save_path)
 
-    os.chdir(cnf_save_path)
-
-    if overwrite == False:
-        os.mkdir("cnf_"+date)
-        cnf_save_path = os.path.join(cnf_save_path,"cnf_"+date)
-        os.chdir(cnf_save_path)
-
+    sendlog(cnf_save_path, "============ Acquisition section =================")
     sendlog(cnf_save_path, "Starting at "+date)
     sendlog(cnf_save_path, "Config save folder is: " + str(cnf_save_path))
 
@@ -678,6 +690,7 @@ def start():
         else:
             commands = get_commands_from_file(os.path.join(curr_path, platform_to_commands[device['platform']]))
 
+        sendlog(cnf_save_path, "============ Processing section =================")
         sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device, timeout_ops=180) as ssh:
