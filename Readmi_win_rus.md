@@ -29,7 +29,8 @@ TRANSPORT=sshv2
 TIMEOUT_SOCKET=5
 TIMEOUT_TRANSPORT=10
 WORKING_DIRECTORY=
-BACKUP_CONFIG_FOLDER='/opt/backup'
+BACKUP_CONFIG_FOLDER='путь куда сохранять копии конфигов edgecore'
+OUTPUT_FOLDER='путь куда сохранять результаты выполнения команд'
 ```
 Любые пробелы, табуляция после '=' или значений ключей должны отсутствовать.
 8. Сформировать файл 'devices.txt' (см. пример файла 'devices_sample.txt' в репозитории и пояснения в README.md. 

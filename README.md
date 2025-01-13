@@ -35,8 +35,10 @@ TIMEOUT_SOCKET=5
 TIMEOUT_TRANSPORT=10
 WORKING_DIRECTORY=
 BACKUP_CONFIG_FOLDER='Path to store backups'
+OUTPUT_FOLDER='Path to store collected data'
 ```
-Любые пробелы, табуляция после '=' или значений ключей должны отсутствовать.
+
+Any spaces, tabs, and so on after '=' MUST be absent. 
 
 3. Put actual devices information into 'devices.txt' file (see below).
 4. Change file '<your_platform>_commands.txt' file (if required).
