@@ -1,5 +1,0 @@
-pycparser
-python-decouple
-scrapli
-scrapli-community
-ssh2-python

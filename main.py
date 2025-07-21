@@ -730,7 +730,7 @@ def start():
     if save_backups:
         os.chdir(backups_save_path)
         for device in devices:
-            sendlog(cnf_save_path, "Starting collection of configs from {}".format(device['host']))
+            sendlog(cnf_save_path, "Starting collection config backups from {}".format(device['host']))
             try:
                 with Scrapli(**device, timeout_ops=180) as ssh:
                     if device['platform'] == 'edgecore_sonic':
@@ -751,7 +751,15 @@ def start():
                             sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
 
                         rewriteoutfile(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_frr.conf', output_config_files_filter(reply.result))
+                    elif device['platform'] == 'huawei_vrp':
+                        time.sleep(0.2)
+                        reply = ssh.send_command('display current-configuration')
+                        time.sleep(0.2)
 
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        rewriteoutfile(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_config.txt', output_config_files_filter(reply.result))
             except ScrapliException as error:
                 print(error)
 
