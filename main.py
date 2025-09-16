@@ -7,7 +7,8 @@ import os
 from scrapli.driver import GenericDriver
 import time
 import re
-import logging
+# import logging
+from scrapli.logging import enable_basic_logging
 
 
 AUTH_USERNAME = config('AUTH_USERNAME')
@@ -60,7 +61,6 @@ edgecore_excluded_errors = [
     '/usr/local/lib/python3.7/dist-packages/ax_interface/mib.py',
     '/usr/local/lib/python3.7/dist-packages/sonic_ax_impl/mibs/ietf/rfc1213.py'
 ]
-
 
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
@@ -610,15 +610,16 @@ def start():
     global cnf_save_path
 
     if __debug__:
-        logging.basicConfig(filename="scrapli.log", level=logging.DEBUG)
+        # enable_basic_logging(file=True, level="debug")
+        enable_basic_logging(file="scrapli.log", level="debug")
+#        logging.basicConfig(file=True, filename="scrapli.log", level=logging.DEBUG)
     else:
-        logging.basicConfig(filename="scrapli.log", level=logging.INFO)
-
+        enable_basic_logging(file=False)
+ #       logging.basicConfig(file=False, filename="scrapli.log", level=logging.INFO)
 
     if (namespace.devices is None):
         print("Path to file with list of devices required! Key: -d <path>")
         exit()
-
 
     if (namespace.commands is not None):
         print("          ... path to file with commands specified")
