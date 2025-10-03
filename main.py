@@ -39,7 +39,8 @@ family_to_platform = {
     'EOS': 'arista_eos',
     'VRP': 'huawei_vrp',
     'ARUBA AOS-S': 'aruba_aoscx',
-    'Edgecore SONIC': 'edgecore_sonic'
+    'Edgecore SONIC': 'edgecore_sonic',
+    'RDP EcoNPB': 'rdp_econpb'
 }
 
 
@@ -53,6 +54,7 @@ platform_to_commands = {
     'huawei_vrp': 'huawei_commands.txt',
     'aruba_aoscx': 'hpe_aruba_commands.txt',
     'edgecore_sonic': 'edgecore_commands.txt',
+    'rdp_econpb': 'rdp_commands.txt',
     'unknown_platform': 'default_commands.txt'
 }
 
@@ -160,6 +162,14 @@ def obtain_model(vendor, config):
         else:
             return "Not_found"
 
+    if vendor == 'rdp':
+        match = re.search('\s+product-name\s+(\S+)', config)
+        if match:
+            return match.group(1).strip()
+        else:
+            return "Not_found"
+
+
     return "Model_vendor_not_found"
 
 
@@ -198,6 +208,10 @@ def obtain_software_version(config, family):
             return match.group(1).strip()
     elif family == 'Edgecore SONIC':
         match = re.search("\s*SONiC Software Version:\s*(\S+)", config)
+        if match:
+            return match.group(1).strip()
+    elif family == 'RDP EcoNPB':
+        match = re.search("\s+serial-number\s(\S+)", config)
         if match:
             return match.group(1).strip()
     else:
@@ -241,7 +255,11 @@ def obtain_software_family(config):
                                 if match:
                                     return "Edgecore SONIC"
                                 else:
-                                    return "unknown_platform"
+                                    match = re.search("\s*FlowBalancer\s*(\S+)", config)
+                                    if match:
+                                        return "RDP EcoNPB"
+                                    else:
+                                        return "unknown_platform"
 
 
 def obtain_hostname(config):
@@ -403,6 +421,7 @@ def strip_characters_from_prompt(prompt):
     prompt = prompt.replace(':', '')
     prompt = prompt.replace('~', '')
     prompt = prompt.replace('$', '')
+    prompt = prompt.replace('\x00', '')
 
     if "@" in prompt:
         prompt = prompt.split('@',1)[1]
@@ -425,9 +444,9 @@ def get_show_version(ip, login, passw):
     response = ''
 
     try:
-        with GenericDriver(**my_device) as conn:
+        with GenericDriver(**my_device, comms_prompt_pattern=r"^\S{0,700}[#>$~@:\]]\s*$") as conn:
             time.sleep(0.1)
-            hname = conn.get_prompt()
+            hname = conn.get_prompt().strip()
             time.sleep(0.1)
 
             response = conn.send_command("terminal length 0", strip_prompt = False)
@@ -447,6 +466,10 @@ def get_show_version(ip, login, passw):
 #                response = conn.send_command("no page", strip_prompt=False)
                 vendor = 'edgecore'
 
+            if 'undefined command: ' in response.result:
+#                response = conn.send_command("no page", strip_prompt=False)
+                vendor = 'rdp'
+
             if __debug__:
                 sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response.result)
 
@@ -462,11 +485,15 @@ def get_show_version(ip, login, passw):
                 response = conn.send_command("show system", strip_prompt = False)
                 time.sleep(0.2)
                 response1 = conn.send_command("show system mem", strip_prompt = False)
-                time.sleep(0.2)
                 response.result = response.result + '\n' + response1.result
             elif vendor == 'edgecore':
                 response = conn.send_command("show version", strip_prompt = False)
                 time.sleep(0.2)
+            elif vendor == 'rdp':
+                response = conn.send_command("show rdp-firmware", strip_prompt = False)
+                time.sleep(0.2)
+                response1 = conn.send_command("show hardware-info platform-info", strip_prompt=False)
+                response.result = response.result + '\n' + response1.result
 
     except ScrapliAuthenticationFailed as error:
         sendlog(cnf_save_path, "IP: " + ip + " Authentification Error " +str(error) + " - please, check username, password and driver.")
@@ -756,10 +783,14 @@ def start():
                         reply = ssh.send_command('display current-configuration')
                         time.sleep(0.2)
 
+                    elif device['platform'] == 'rdp_econpb':
+                        time.sleep(0.2)
+                        reply = ssh.send_command('show | view set')
+                        time.sleep(0.2)
                         if __debug__:
                             sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
 
-                        rewriteoutfile(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_config.txt', output_config_files_filter(reply.result))
+                        rewriteoutfile(backups_save_path, 'RDP_' + device['host'] + '_config.txt', output_config_files_filter(reply.result))
             except ScrapliException as error:
                 print(error)
 
