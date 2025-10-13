@@ -1,1 +1,3 @@
 show | view set
+show rdp-firmware
+show hardware-info platform-info
