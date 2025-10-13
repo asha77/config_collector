@@ -223,43 +223,30 @@ def obtain_software_family(config):
     '''
     Extract software family from show version
     '''
-    match = re.search("Cisco IOS.XE .oftware", config)
-    if match:
+    if re.search("Cisco IOS.XE .oftware", config):
         return "IOS XE"
+    elif re.search("Cisco Nexus Operating System", config):
+        return "NX-OS"
+    elif re.search("Cisco IOS Software", config):
+        return "IOS"
+    elif re.search("Arista", config):
+        return "EOS"
+    elif re.search("Huawei Versatile Routing Platform", config):
+        return "VRP"
+    elif re.search("ArubaOS", config):
+        return "ARUBAOS"
+    elif re.search("\s*Software revision\s*:\s*(\S+)", config):
+        return "ARUBA AOS-S"
+    elif re.search("\s*SONiC Software Version:\s*(\S+)", config):
+        return "Edgecore SONIC"
+    elif re.search("\s*FlowBalancer\s*(\S+)", config):
+        return "RDP EcoNPB"
+    elif re.search("\s*SDNSwitch-packet-broker\s*(\S+)", config):
+        return "RDP EcoNPB"
+    elif re.search("\s*EcoNPB\s*(\S+)", config):
+        return "RDP EcoNPB"
     else:
-        match = re.search("Cisco Nexus Operating System", config)
-        if match:
-            return "NX-OS"
-        else:
-            match = re.search("Cisco IOS Software", config)
-            if match:
-                return "IOS"
-            else:
-                match = re.search("Arista", config)
-                if match:
-                    return "EOS"
-                else:
-                    match = re.search("Huawei Versatile Routing Platform", config)
-                    if match:
-                        return "VRP"
-                    else:
-                        match = re.search("ArubaOS", config)
-                        if match:
-                            return "ARUBAOS"
-                        else:
-                            match = re.search("\s*Software revision\s*:\s*(\S+)", config)
-                            if match:
-                                return "ARUBA AOS-S"
-                            else:
-                                match = re.search("\s*SONiC Software Version:\s*(\S+)", config)
-                                if match:
-                                    return "Edgecore SONIC"
-                                else:
-                                    match = re.search("\s*FlowBalancer\s*(\S+)", config)
-                                    if match:
-                                        return "RDP EcoNPB"
-                                    else:
-                                        return "unknown_platform"
+        return "unknown_platform"
 
 
 def obtain_hostname(config):
