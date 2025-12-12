@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from scrapli import Scrapli
 from scrapli.exceptions import ScrapliException, ScrapliAuthenticationFailed, ScrapliConnectionNotOpened
 from decouple import config
