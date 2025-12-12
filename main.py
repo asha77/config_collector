@@ -10,7 +10,6 @@ import re
 # import logging
 from scrapli.logging import enable_basic_logging
 
-
 AUTH_USERNAME = config('AUTH_USERNAME')
 AUTH_PASSWORD = config('AUTH_PASSWORD')
 AUTH_SECONDARY = config('AUTH_SECONDARY')
@@ -28,7 +27,6 @@ try:
 except:
     print("          ... it seems that no \"OUTPUT_FOLDER\" parameter specified in .env file - using by-default values...")
     OUTPUT_FOLDER = ''
-
 
 family_to_platform = {
     'IOS': 'cisco_iosxe',
