@@ -1,2 +1,4 @@
 scrapli~=2023.1.30
 python-decouple~=3.8
+scrapli[ssh2]
+scrapli[community]
