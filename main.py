@@ -769,7 +769,9 @@ def start():
                         time.sleep(0.2)
                         reply = ssh.send_command('display current-configuration')
                         time.sleep(0.2)
-
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+                        rewriteoutfile(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_config.txt', output_config_files_filter(reply.result))
                     elif device['platform'] == 'rdp_econpb':
                         time.sleep(0.2)
                         reply = ssh.send_command('show | view set')
