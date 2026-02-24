@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from operator import truediv
 
 from scrapli import Scrapli
 from scrapli.exceptions import ScrapliException, ScrapliAuthenticationFailed, ScrapliConnectionNotOpened
@@ -11,6 +12,8 @@ import time
 import re
 # import logging
 from scrapli.logging import enable_basic_logging
+from prometheus_remote_writer import RemoteWriter
+
 
 AUTH_USERNAME = config('AUTH_USERNAME')
 AUTH_PASSWORD = config('AUTH_PASSWORD')
@@ -24,10 +27,13 @@ TIMEOUT_SOCKET = config('TIMEOUT_SOCKET')
 TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
 BACKUP_CONFIG_FOLDER = config('BACKUP_CONFIG_FOLDER')
+PROMETHEUS_URL=config('PROMETHEUS_URL')
+PROMETHEUS_TOKEN=config('PROMETHEUS_TOKEN')
+
 try:
     OUTPUT_FOLDER = config('OUTPUT_FOLDER')
 except:
-    print("          ... it seems that no \"OUTPUT_FOLDER\" parameter specified in .env file - using by-default values...")
+    print("          ... it seems that \"OUTPUT_FOLDER\" parameter not specified in .env file - using by-default values...")
     OUTPUT_FOLDER = ''
 
 family_to_platform = {
@@ -64,6 +70,10 @@ edgecore_excluded_errors = [
     '/usr/local/lib/python3.7/dist-packages/sonic_ax_impl/mibs/ietf/rfc1213.py'
 ]
 
+# data structure to check switch health
+switch_state = []
+
+
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
     resfile = open(file_name, 'a', encoding='utf-8')
@@ -90,9 +100,10 @@ def rewriteoutfile(path, ip, message):
 def createparser():
     parser = argparse.ArgumentParser(prog='YAUCC - Yet Another Universal Config Collector', description='Python app for executing commands on network equipment using SSH', epilog='author: asha77@gmail.com')
     parser.add_argument('-d', '--devfile', dest="devices", required=True, help='Specify file with set of devices')
-    parser.add_argument('-c', '--comfiles', dest="commands",  required=False, help='Specify file with commands to be executed (cancels autodetection of command set according to device platform)')
+    parser.add_argument('-c', '--commands', dest="commands",  required=False, help='Specify file with commands to be executed (cancels autodetection of command set according to device platform)')
     parser.add_argument('-o', '--overwrite', required=False, action='store_true', help='Specify to save and overwrite files into the same folder e.g. \"output\" folder')
     parser.add_argument('-b', '--backup_configs', required=False, action='store_true', help='Specify to save and overwrite separately config files into \"config\" folder')
+    parser.add_argument('-q', '--quiz', required=False, action='store_true', help='Test switches state with some predefined health check')
     return parser
 
 
@@ -276,9 +287,11 @@ def assign_platform(dev_family):
     return platform
 
 
-def get_devices_from_file(file):
+def get_devices_from_file(file, quiz):
     devices = []
     hostnames = []
+    switch_state = []
+
     with open(file) as f:
         for line in f.readlines():
             if line[0] == '#':
@@ -317,9 +330,43 @@ def get_devices_from_file(file):
             else:
                 ena_pass = AUTH_SECONDARY
 
+            if quiz:
+                # Creating default dictionary
+                switch = {
+                    "ip": "undefined",
+                    "name": "undefined",
+                    "available": "undefined",
+                    "system-health": "undefined",
+                    "container-state": "undefined",
+                    "container-uptime": "undefined",
+                    "swss-log-state": "undefined",
+                    "sairedis-log-state": "undefined",
+                    "sairedis-records-state": "undefined",
+                    "ipv6-on-svi-state": "undefined",
+                    "bgp-state": "undefined",
+                    "bfd-state": "undefined",
+                    "ntp-state": "undefined",
+                    "dns-state": "undefined",
+                    "fan-state": "undefined",
+                    "psu-state": "undefined",
+                    "uptime-state": "undefined",
+                    "reboot-state": "undefined",
+                    "coredump-state": "undefined",
+                    "auto-ts-state": "undefined",
+                    "disk-space-state": "undefined",
+                    "int-errors-state": "undefined"
+                }
+
             vendor, showver, hname = get_show_version(str[1], uname, passw)
 
             if((showver == '') and (hname == '')):
+                # Device is not accessible or return something that unusable
+                # Set its available status = false and add to switch_state
+                if quiz:
+                    switch["ip"] = str[1]
+                    switch["name"] = "not_detected"
+                    switch["available"] = "fail"
+                    switch_state.append(switch)
                 continue
 
             if __debug__:
@@ -377,7 +424,14 @@ def get_devices_from_file(file):
 
             hostnames.append(hn)
 
-    return devices, hostnames
+            # Add valid record to switch_state
+            if quiz:
+                switch["ip"] = str[1]
+                switch["name"] = hname
+                switch["available"] = "pass"
+                switch_state.append(switch)
+
+    return devices, hostnames, switch_state
 
 
 def get_commands_from_file(file):
@@ -651,6 +705,12 @@ def start():
     else:
         save_backups = False
 
+    if (namespace.quiz):
+        print("          ... will check switches for general health (quiz)")
+        quiz = True
+    else:
+        quiz = False
+
     startTime = datetime.now()
     date = str(startTime.date()) + "-" + str(startTime.strftime("%H-%M-%S"))
 
@@ -691,11 +751,12 @@ def start():
     sendlog(cnf_save_path, "Config save folder is: " + str(cnf_save_path))
 
     # Get list of available device files
-    devices, hostnames = get_devices_from_file(os.path.join(curr_path, namespace.devices))
+    devices, hostnames, switch_state = get_devices_from_file(os.path.join(curr_path, namespace.devices), quiz)
 
     sendlog(cnf_save_path, str(len(devices)) + " devices loaded")
 #    sendlog(cnf_save_path, str(len(commands)) + " commands loaded")
 
+    sendlog(cnf_save_path, "============ Processing section =================")
     # connect to devices
     for device in devices:
         devStartTime = datetime.now()
@@ -705,7 +766,6 @@ def start():
         else:
             commands = get_commands_from_file(os.path.join(curr_path, platform_to_commands[device['platform']]))
 
-        sendlog(cnf_save_path, "============ Processing section =================")
         sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
         try:
             with Scrapli(**device, timeout_ops=180) as ssh:
@@ -782,6 +842,286 @@ def start():
                         rewriteoutfile(backups_save_path, 'RDP_' + device['host'] + '_config.txt', output_config_files_filter(reply.result))
             except ScrapliException as error:
                 print(error)
+
+    # separately check switch state
+    if quiz:
+        os.chdir(cnf_save_path)
+        for device in devices:
+            sendlog(cnf_save_path, "Starting quizing device {}".format(device['host']))
+            try:
+                with Scrapli(**device, timeout_ops=180) as ssh:
+                    if device['platform'] == 'edgecore_sonic':
+
+                    # container-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command('docker ps -a | grep -vc Exited')
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if int(reply.result) == 14:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] ==  device['host']:
+                                if check_res:
+                                    sw.update({"container-state": "pass"})
+                                else:
+                                    sw.update({"container-state": "fail"})
+
+                    # container-uptime check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("uptime | awk '{print $3}' | sed 's/,//'")
+                        time.sleep(0.2)
+                        reply2 = ssh.send_command("docker ps | awk '/docker/ {print $8}' | sort -u")
+
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if int(reply.result) == int(reply2.result):
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] ==  device['host']:
+                                if check_res:
+                                    sw.update({"container-uptime": "pass"})
+                                else:
+                                    sw.update({"container-uptime": "fail"})
+
+
+                        # system-health check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("sudo show system-health summary")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if ("GREEN" in reply.result or ("FAIL" not in reply.result)):
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"system-health": "pass"})
+                                else:
+                                    sw.update({"system-health": "fail"})
+
+                        # ipv6-on-svi-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("show ipv6 link-local-mode | grep -i 'Vlan' | grep -i Disable | wc -l")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if int(reply.result) == 0:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"ipv6-on-svi-state": "pass"})
+                                else:
+                                    sw.update({"ipv6-on-svi-state": "fail"})
+
+                        # bgp-state
+                        time.sleep(0.2)
+                        reply = ssh.send_command("show ip bgp summ | grep -v -E '[0-9]+[ywdh]' | grep -ic Ethernet")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if int(reply.result) == 0:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"bgp-state": "pass"})
+                                else:
+                                    sw.update({"bgp-state": "fail"})
+
+                        # bfd-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("vtysh -c 'show bfd peers' | grep -c down")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if int(reply.result) == 0:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"bfd-state": "pass"})
+                                else:
+                                    sw.update({"bfd-state": "fail"})
+
+                        # ntp-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("show ntp")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if 'unsynchronised' in reply.result:
+                            check_res = False
+                        else:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"ntp-state": "pass"})
+                                else:
+                                    sw.update({"ntp-state": "fail"})
+
+                        # psu-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("show platform psustatus | grep OK | wc -l")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if int(reply.result) == 2:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"psu-state": "pass"})
+                                else:
+                                    sw.update({"psu-state": "fail"})
+
+                        # uptime-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("uptime | grep '0 days'")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if reply.result == "":
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"uptime-state": "pass"})
+                                else:
+                                    sw.update({"uptime-state": "fail"})
+
+                        # reboot-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("show reboot history")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if  '-' in reply.result:
+                            check_res = False
+                        else:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"reboot-state": "pass"})
+                                else:
+                                    sw.update({"reboot-state": "fail"})
+
+                        # coredump-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("show kdump files")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if 'No kernel core dump file available!' in reply.result:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"coredump-state": "pass"})
+                                else:
+                                    sw.update({"coredump-state": "fail"})
+
+                        # auto-ts-state check
+                        time.sleep(0.2)
+                        reply = ssh.send_command("show auto-techsupport history")
+                        time.sleep(0.2)
+                        if __debug__:
+                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                        check_res = False
+                        if 'techsupportdump' in reply.result:
+                            check_res = False
+                        else:
+                            check_res = True
+
+                        for sw in switch_state:
+                            if sw['ip'] == device['host']:
+                                if check_res:
+                                    sw.update({"auto-ts-state": "pass"})
+                                else:
+                                    sw.update({"auto-ts-state": "fail"})
+
+
+                            """
+                            switch = {
+                                "swss-log-state": "undefined",
+                                "sairedis-log-state": "undefined",
+                                "sairedis-records-state": "undefined",
+                                "dns-state": "undefined",
+                                "fan-state": "undefined",
+                                "disk-space-state": "undefined",
+                                "int-errors-state": "undefined"
+                            }
+                            """
+
+            except ScrapliException as error:
+                print(error)
+
+        # Create a RemoteWriter instance
+
+        if PROMETHEUS_URL != '':
+            writer = RemoteWriter(url=PROMETHEUS_URL,
+                                headers={'Authorization': 'Bearer ' + PROMETHEUS_TOKEN}
+                                )
+
+        for sw in switch_state:
+            allstate = True
+            # Prepare the data to send
+            for key, value in sw.items():
+                if value == 'fail':
+                    allstate = False
+
+            if not allstate:
+                data = [
+                    {
+                        'metric': {'__name__': 'allstate', 'host': sw['ip']},
+                        'values': [allstate],
+                        'timestamps': [time.time()]
+                    }
+                ]
+
+                # Send the data
+                if PROMETHEUS_URL != '':
+                    writer.send(data)
+
+                print(data)
+                print(sw)
 
 
 if __name__ == '__main__':
