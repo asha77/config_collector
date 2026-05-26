@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-from operator import truediv
-
+# from operator import truediv
 from scrapli import Scrapli
 from scrapli.exceptions import ScrapliException, ScrapliAuthenticationFailed, ScrapliConnectionNotOpened
-from decouple import config
+from decouple import config, UndefinedValueError
 import argparse
 from datetime import datetime
 import os
@@ -32,9 +31,10 @@ PROMETHEUS_TOKEN=config('PROMETHEUS_TOKEN')
 
 try:
     OUTPUT_FOLDER = config('OUTPUT_FOLDER')
-except:
+except UndefinedValueError:
     print("          ... it seems that \"OUTPUT_FOLDER\" parameter not specified in .env file - using by-default values...")
-    OUTPUT_FOLDER = ''
+    OUTPUT_FOLDER = './output'
+
 
 family_to_platform = {
     'IOS': 'cisco_iosxe',
@@ -64,7 +64,7 @@ platform_to_commands = {
     'unknown_platform': 'default_commands.txt'
 }
 
-# filters description - lines according to these regulars are NOT save into file. Can be expanded.
+# filters description - lines according to these regulars will not be written into file.
 edgecore_excluded_errors = [
     '/usr/local/lib/python3.7/dist-packages/ax_interface/mib.py',
     '/usr/local/lib/python3.7/dist-packages/sonic_ax_impl/mibs/ietf/rfc1213.py'
@@ -108,9 +108,9 @@ def createparser():
 
 
 def obtain_model(vendor, config):
-    '''
+    """
     Extract model number
-    '''
+    """
 
     # cisco and arista a treated as the same - they are similar
     if vendor == 'cisco':
@@ -185,9 +185,9 @@ def obtain_model(vendor, config):
 
 
 def obtain_software_version(config, family):
-    '''
+    """
     Extract software version
-    '''
+    """
 
     if family == 'IOS XE':
         match = re.search("Cisco .+ Version ([0-9.()A-Za-z]+)", config)
@@ -231,9 +231,9 @@ def obtain_software_version(config, family):
 
 
 def obtain_software_family(config):
-    '''
+    """
     Extract software family from show version
-    '''
+    """
     if re.search("Cisco IOS.XE .oftware", config):
         return "IOS XE"
     elif re.search("Cisco Nexus Operating System", config):
@@ -261,9 +261,9 @@ def obtain_software_family(config):
 
 
 def obtain_hostname(config):
-    '''
+    """
     Extract device hostname
-    '''
+    """
 
     match = re.search("hostname (.*)", config)
     if match:
@@ -273,14 +273,13 @@ def obtain_hostname(config):
 
 
 def assign_platform(dev_family):
-    '''
+    """
     Assign device platform based on device family
-    '''
-
+    """
     try:
         platform = family_to_platform[dev_family]
     except KeyError as error:
-        # можно также присвоить значение по умолчанию вместо бросания исключения
+        # можно также присвоить значение по умолчанию вместо исключения
         sendlog(cnf_save_path, "No suitable platform for device family {}".format(dev_family))
 #        raise ValueError('Undefined unit: {}'.format(e.args[0]))
         platform = ""
@@ -359,7 +358,7 @@ def get_devices_from_file(file, quiz):
 
             vendor, showver, hname = get_show_version(str[1], uname, passw)
 
-            if((showver == '') and (hname == '')):
+            if (showver == '') and (hname == ''):
                 # Device is not accessible or return something that unusable
                 # Set its available status = false and add to switch_state
                 if quiz:
@@ -545,7 +544,7 @@ def get_show_version(ip, login, passw):
     except ScrapliException as error:
         sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
         if hasattr(response, 'result'):
-            if ((not response.result == '') and (not hname == '')):
+            if (not response.result == '') and (not hname == ''):
                 return vendor, response.result, strip_characters_from_prompt(hname)
             else:
                 return '', '', ''
@@ -553,7 +552,7 @@ def get_show_version(ip, login, passw):
             return '', '', ''
     finally:
         if hasattr(response, 'result'):
-            if ((not response.result == '') and (not hname == '')):
+            if (not response.result == '') and (not hname == ''):
                 return vendor, response.result, strip_characters_from_prompt(hname)
             else:
                 return '', '', ''
@@ -562,13 +561,13 @@ def get_show_version(ip, login, passw):
 
 
 def output_filter(input):
-    '''
+    """
     Output data obfuscation and filtering:
     radius-server key XXXX
     snmp-server community XXX RX
     tacacs server server
         key 6 ХХХ
-    '''
+    """
 
     lines = input.split('\n')
     lines_out = []
@@ -633,14 +632,14 @@ def output_filter(input):
 
 
 def output_config_files_filter(input):
-    '''
+    """
     Filter unnecessary lines
 
    Building configuration...
    Current configuration:
    !
    end
-    '''
+    """
 
     lines = input.split('\n')
     lines_out = []
@@ -685,34 +684,34 @@ def start():
         enable_basic_logging(file=False)
  #       logging.basicConfig(file=False, filename="scrapli.log", level=logging.INFO)
 
-    if (namespace.devices is None):
+    if namespace.devices is None:
         print("Path to file with list of devices required! Key: -d <path>")
         exit()
 
-    if (namespace.commands is not None):
+    if namespace.commands is not None:
         print("          ... path to file with commands specified")
         commfile_path_specified = True
 
-    if (namespace.overwrite):
+    if namespace.overwrite:
         print("          ... files will be overwritten - you'll find just last result in \"output\" folder")
         overwrite = True
     else:
         overwrite = False
 
-    if (namespace.backup_configs):
+    if namespace.backup_configs:
         print("          ... config files will be collected and overwritten - you'll find result in \"configs\" folder")
         save_backups = True
     else:
         save_backups = False
 
-    if (namespace.quiz):
+    if namespace.quiz:
         print("          ... will check switches for general health (quiz)")
         quiz = True
     else:
         quiz = False
 
-    startTime = datetime.now()
-    date = str(startTime.date()) + "-" + str(startTime.strftime("%H-%M-%S"))
+    start_time = datetime.now()
+    date = str(start_time.date()) + "-" + str(start_time.strftime("%H-%M-%S"))
 
     if not WORKING_DIRECTORY:
         curr_path = os.path.abspath(os.getcwd())
@@ -732,7 +731,7 @@ def start():
 
     os.chdir(cnf_save_path)
 
-    if overwrite == False:
+    if not overwrite:
         os.mkdir("cnf_"+date)
         cnf_save_path = os.path.join(cnf_save_path,"cnf_"+date)
         os.chdir(cnf_save_path)
@@ -759,7 +758,7 @@ def start():
     sendlog(cnf_save_path, "============ Processing section =================")
     # connect to devices
     for device in devices:
-        devStartTime = datetime.now()
+        dev_start_time = datetime.now()
 
         if commfile_path_specified:
             commands = get_commands_from_file(os.path.join(curr_path, namespace.commands))
@@ -770,7 +769,7 @@ def start():
         try:
             with Scrapli(**device, timeout_ops=180) as ssh:
 
-                if overwrite == True:
+                if overwrite:
                     rewriteoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames) + '.log', "Data collected: " + date + "\n")
 
                 for command in commands:
@@ -798,7 +797,7 @@ def start():
                         sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' send: ' + command + ' - nothing received!')
         except ScrapliException as error:
             print(error)
-        sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - devStartTime))
+        sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - dev_start_time))
 
     # separately get configuration and save them into 'config' folder for backup
     if save_backups:
@@ -899,7 +898,7 @@ def start():
                             sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
 
                         check_res = False
-                        if ("GREEN" in reply.result or ("FAIL" not in reply.result)):
+                        if ("GREEN" in reply.result) or ("FAIL" not in reply.result):
                             check_res = True
 
                         for sw in switch_state:
@@ -1077,7 +1076,6 @@ def start():
                                 else:
                                     sw.update({"auto-ts-state": "fail"})
 
-
                             """
                             switch = {
                                 "swss-log-state": "undefined",
@@ -1089,7 +1087,6 @@ def start():
                                 "int-errors-state": "undefined"
                             }
                             """
-
             except ScrapliException as error:
                 print(error)
 
