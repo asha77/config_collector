@@ -751,8 +751,8 @@ def start():
                         sendlog(cnf_save_path, device['host'] + " send command: " + command)
 
                     time.sleep(0.2)
-                    reply = ssh.send_command(command)
-                    time.sleep(0.2)
+                    reply = ssh.send_command(command, timeout_ops=30)
+                    time.sleep(0.8)
 
                     if __debug__:
                         sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
