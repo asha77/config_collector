@@ -647,6 +647,7 @@ def start():
     parser = create_parser()
     namespace = parser.parse_args()
     comm_file_path_specified = False
+    print("НОВАЯ ВЕРСИЯ ДЛЯ ДЕМО!!!!")
 
     if __debug__:
         # enable_basic_logging(file=True, level="debug")
