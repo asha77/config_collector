@@ -1,3 +1,0 @@
-show running-config
-show version
-show inventory
