@@ -707,7 +707,7 @@ def start():
     os.chdir(cnf_save_path)
 
     if not overwrite:
-        os.mkdir("cnf_"+date)
+        os.mkdir("cnf_" + date)
         cnf_save_path = os.path.join(cnf_save_path,"cnf_" + date)
         os.chdir(cnf_save_path)
 
@@ -777,11 +777,13 @@ def start():
     # collect configuration and save them into 'config' folder for backup
     if save_backups:
         if days_backups > 1:
-            backups_save_path = os.path.join(backups_save_path, 'bckp_' + date)
-            if not os.path.isdir(backups_save_path):
-                os.mkdir(backups_save_path)
+            backups_save_path_now = os.path.join(backups_save_path, 'bckp_' + date)
+            if not os.path.isdir(backups_save_path_now):
+                os.mkdir(backups_save_path_now)
+        else:
+            backups_save_path_now = backups_save_path
 
-        os.chdir(backups_save_path)
+        os.chdir(backups_save_path_now)
         for device in devices:
             sendlog(cnf_save_path, "Starting collection config backups from {}".format(device['host']))
             try:
@@ -794,7 +796,7 @@ def start():
                         if __debug__:
                             sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
 
-                        rewrite_out_file(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_config_db.json', output_config_files_filter(reply.result))
+                        rewrite_out_file(backups_save_path_now, get_hostname_by_ip(device['host'], hostnames) + '_config_db.json', output_config_files_filter(reply.result))
 
                         time.sleep(0.2)
                         reply = ssh.send_command('show runningconfiguration bgp')
@@ -803,14 +805,14 @@ def start():
                         if __debug__:
                             sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
 
-                        rewrite_out_file(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_frr.conf', output_config_files_filter(reply.result))
+                        rewrite_out_file(backups_save_path_now, get_hostname_by_ip(device['host'], hostnames) + '_frr.conf', output_config_files_filter(reply.result))
                     elif device['platform'] == 'huawei_vrp':
                         time.sleep(0.2)
                         reply = ssh.send_command('display current-configuration')
                         time.sleep(0.2)
                         if __debug__:
                             sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
-                        rewrite_out_file(backups_save_path, get_hostname_by_ip(device['host'], hostnames) + '_config.txt', output_config_files_filter(reply.result))
+                        rewrite_out_file(backups_save_path_now, get_hostname_by_ip(device['host'], hostnames) + '_config.txt', output_config_files_filter(reply.result))
                     elif device['platform'] == 'rdp_econpb':
                         time.sleep(0.2)
                         reply = ssh.send_command('show | view set')
@@ -818,11 +820,11 @@ def start():
                         if __debug__:
                             sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
 
-                        rewrite_out_file(backups_save_path, 'RDP_' + device['host'] + '_config.txt', output_config_files_filter(reply.result))
+                        rewrite_out_file(backups_save_path_now, 'RDP_' + device['host'] + '_config.txt', output_config_files_filter(reply.result))
             except ScrapliException as error:
                 print(error)
 
-        delete_old_backups(".", days_old=days_backups)
+        delete_old_backups(backups_save_path, days_old=days_backups)
 
 if __name__ == '__main__':
     start()

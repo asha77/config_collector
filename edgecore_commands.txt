@@ -1,6 +1,7 @@
 show version
 sudo show system-health summary
 show ntp
+show lldp table
 # show dns nameserver - only in 202311
 #sudo show system-health detail
 #show platform fan
@@ -17,7 +18,6 @@ show ntp
 #df -h
 #show ipv6 link-local-mode
 #vtysh -c 'show bfd peers'
-#show lldp table
 #show runningconfiguration all
 #show runningconfiguration bgp
 #sudo bridge fdb show
