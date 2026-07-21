@@ -5,4 +5,4 @@ scrapli[paramiko]
 scrapli[community]
 pip
 setuptools==81.0.0
-wheel==0.44.0
+wheel>=0.46.2
