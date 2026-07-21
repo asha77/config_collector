@@ -70,6 +70,24 @@ edgecore_excluded_errors = [
     '/usr/local/lib/python3.7/dist-packages/sonic_ax_impl/mibs/ietf/rfc1213.py'
 ]
 
+# regexp to replace string content for data obfuscation
+obfuscations = {
+    r"radius-server key (.*)": r"radius-server key ХХХ",
+    r"snmp-server community (.*) RO": r"snmp-server community XXX RO",
+    r"snmp-server community (.*) RW": r"snmp-server community XXX RW",
+    r"\skey (\d) (.*)": r" key XXX YYY",
+    r"username ([a-zA-Z0-9_.-]+) privilege (\d+) password (.*)": r"username XXX privilege YYY password ZZZ",
+    r"username ([a-zA-Z0-9_.-]+) privilege (\d+) secret (\d+) (.*)": r"username XXX privilege YYY secret ZZZ WWW",
+    r"enable secret (\d) (.*)": r"enable secret XXX YYY",
+    r"radius server shared-key (.*)": r"radius server shared-key XXX",
+    r"\s*local-user ([a-zA-Z0-9_.-]+)": r" local-user XXX",
+    r"\s*ospf authentication (.*)": r" ospf authentication XXX",
+    r"\s*(.*)\scipher(.*)": r" XXX cipher YYY",
+    r"\s*pre-shared-key(.*)": r" pre-shared-key XXX",
+    r"\s*ssh user\s([a-zA-Z0-9_.-]+)(.*)": r" ssh user XXX YYY"
+}
+
+
 def sendlog(path, message):
     file_name = os.path.join(path, 'logfile.log')
     resfile = open(file_name, 'a', encoding='utf-8')
@@ -510,74 +528,27 @@ def get_show_version(ip, login, passw):
             return '', '', ''
 
 
-def output_filter(reply):
-    """
-    Output data obfuscation and filtering:
-    radius-server key XXXX
-    snmp-server community XXX RX
-    tacacs server <server>
-        key 6 ХХХ
-    """
+def obfuscation_filter(reply):
+    result_text = reply
+    for regex, replacement in obfuscations.items():
+        result_text = re.sub(regex, replacement, result_text)
+    return result_text
 
+
+def thrash_string_filter(reply):
     lines = reply.split('\n')
     lines_out = []
 
     for line in lines:
-        match = re.search("radius-server key (.*)", line)
-        if match:
-            lines_out.append("radius-server key ХХХ")
-        else:
-            match = re.search("snmp-server community (.*) RO", line)
+        matched = False
+        for error_regexp in edgecore_excluded_errors:
+            match = re.search(error_regexp, line)
             if match:
-                lines_out.append("snmp-server community XXX RO")
-            else:
-                match = re.search("snmp-server community (.*) RW", line)
-                if match:
-                    lines_out = "snmp-server community XXX RW"
-                else:
-                    match = re.search("\skey (\d) (.*)", line)
-                    if match:
-                        lines_out.append(" key " + match.group(1).strip() + " XXX")
-                    else:
-                        match = re.search("username (\w+) privilege (\d+) password (.*)", line)
-                        if match:
-                            lines_out.append("username XXX privilege " + match.group(2).strip() + " password XXX")
-                        else:
-                            match = re.search("enable secret (\d) (.*)", line)
-                            if match:
-                                lines_out.append("enable secret " + match.group(1).strip() + " XXX")
-                            else:
-                                match = re.search("radius server shared-key(.*)", line)
-                                if match:
-                                    lines_out.append("radius server shared-key cipher XXX")
-                                else:
-                                    match = re.search("\s*local-user(.*)", line)
-                                    if match:
-                                        lines_out.append(" local-user XXX")
-                                    else:
-                                        match = re.search("\s*ospf authentication(.*)", line)
-                                        if match:
-                                            lines_out.append(" ospf authentication XXX")
-                                        else:
-                                            match = re.search("\s*(.*)\scipher(.*)", line)
-                                            if match:
-                                                lines_out.append(' ' +  match.group(1).strip() + ' cipher XXX')
-                                            else:
-                                                match = re.search("\s*pre-shared-key(.*)", line)
-                                                if match:
-                                                    lines_out.append(" pre-shared-key XXX")
-                                                else:
-                                                    match = re.search("\s*ssh user\s(\w+)(.*)", line)
-                                                    if match:
-                                                        lines_out.append(" ssh user XXX " + match.group(2).strip())
-                                                    else:
-                                                        matched = False
-                                                        for error_regexp in edgecore_excluded_errors:
-                                                            match = re.search(error_regexp, line)
-                                                            if match:
-                                                                matched = True
-                                                        if not matched:
-                                                            lines_out.append(line)
+                matched = True
+                break
+        if not matched:
+            lines_out.append(line)
+
     return '\n'.join(map(str, lines_out))
 
 
@@ -758,7 +729,7 @@ def start():
                         sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
 
                     if reply.result:
-                        filtered_result = output_filter(reply.result)
+                        filtered_result = thrash_string_filter(obfuscation_filter(reply.result))
 
                         if __debug__:
                             ln = len(filtered_result)
