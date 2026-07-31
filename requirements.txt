@@ -4,5 +4,5 @@ scrapli[ssh2]
 scrapli[paramiko]
 scrapli[community]
 pip
-setuptools~>83.0.0
+setuptools~=82.0.0
 wheel>=0.46.2
