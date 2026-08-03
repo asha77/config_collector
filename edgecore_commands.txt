@@ -2,41 +2,41 @@ show version
 sudo show system-health summary
 show ntp
 show lldp table
-# show dns nameserver - only in 202311
-#sudo show system-health detail
-#show platform fan
-#show platform psustatus
-#docker system info
-#show reboot history
-#show kdump files
-#show auto-techsupport history
-#ls -ltcgGh /var/log/swss/sairedis.rec
-#ls -ltcgGh /var/log/swss/swss.rec
-#tail -n 10 /var/log/swss/sairedis.rec
-#show interfaces counters errors | awk '{print $1,$3,$6}'
-#docker ps -a
-#df -h
-#show ipv6 link-local-mode
-#vtysh -c 'show bfd peers'
-#show runningconfiguration all
-#show runningconfiguration bgp
-#sudo bridge fdb show
-#sudo ebtables -L
-#sudo nft list ruleset
-#show vxlan evpn es
-#ip -s nei
-#sudo arp -n
-#show mac
-#bcmcmd "l3 egress show"
-#bcmcmd "l3 info"
-#bcmcmd l2 "l2 show"
-#bcmcmd "l3 defip show"
-#bcmcmd "l3 l3table show"
-#vtysh -c "show evpn mac vni all"
-#vtysh -c "show ip route vrf all"
-#vtysh -c "show evpn arp-cache vni all"
-#vtysh -c "show bgp l2vpn evpn"
-#vtysh -c "show logging"
-#vtysh -c "show bgp summary"
-#swssloglevel -p
-#show log
+show dns nameserver - only in 202311
+sudo show system-health detail
+show platform fan
+show platform psustatus
+docker system info
+show reboot history
+show kdump files
+show auto-techsupport history
+ls -ltcgGh /var/log/swss/sairedis.rec
+ls -ltcgGh /var/log/swss/swss.rec
+tail -n 10 /var/log/swss/sairedis.rec
+show interfaces counters errors | awk '{print $1,$3,$6}'
+docker ps -a
+df -h
+show ipv6 link-local-mode
+vtysh -c 'show bfd peers'
+show runningconfiguration all
+show runningconfiguration bgp
+sudo bridge fdb show
+sudo ebtables -L
+sudo nft list ruleset
+show vxlan evpn es
+ip -s nei
+sudo arp -n
+show mac
+bcmcmd "l3 egress show"
+bcmcmd "l3 info"
+bcmcmd l2 "l2 show"
+bcmcmd "l3 defip show"
+bcmcmd "l3 l3table show"
+vtysh -c "show evpn mac vni all"
+vtysh -c "show ip route vrf all"
+vtysh -c "show evpn arp-cache vni all"
+vtysh -c "show bgp l2vpn evpn"
+vtysh -c "show logging"
+vtysh -c "show bgp summary"
+swssloglevel -p
+show log
