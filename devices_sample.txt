@@ -1,8 +1,0 @@
-# ignored line
-;10.31.70.209;admin1;pass1;pass2;
-;10.31.75.231;admin1;pass1;pass2;
-;10.31.75.232;admin2;pass3;pass4;
-;10.31.75.229;admin3;pass6;pass5;
-;10.31.75.230;megaadmin;pass8;pass9;
-;10.31.75.79;root;pass;pass;
-;10.31.75.79;root;rootpass;rootpass;
