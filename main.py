@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
-from scrapli import Scrapli
-from scrapli.exceptions import ScrapliException, ScrapliAuthenticationFailed, ScrapliConnectionNotOpened
-from decouple import config, UndefinedValueError
 import argparse
-from datetime import datetime, timedelta
 import os
-import shutil
-from scrapli.driver import GenericDriver
-import time
 import re
-# import logging
-from scrapli.logging import enable_basic_logging
+import shutil
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
+from decouple import UndefinedValueError, config
+from scrapli import Scrapli
+from scrapli.driver import GenericDriver
+from scrapli.exceptions import (
+    ScrapliAuthenticationFailed,
+    ScrapliConnectionNotOpened,
+    ScrapliException,
+)
+
+# import logging
+from scrapli.logging import enable_basic_logging
 
 curr_path = None
 cnf_save_path = None
@@ -127,67 +132,67 @@ def obtain_model(vendor, configuration):
 
     # cisco and arista a treated as the same - they are similar
     if vendor == 'cisco':
-        match = re.search("Model\s+\wumber\s*:\s+(.*)", configuration)
+        match = re.search(r"Model\s+\wumber\s*:\s+(.*)", configuration)
         if match:
             return match.group(1).strip()
         else:
-            match = re.search("\wisco\s+(\S+)\s+.*\s+(with)*\d+K/\d+K\sbytes\sof\smemory.", configuration)
+            match = re.search(r"\wisco\s+(\S+)\s+.*\s+(with)*\d+K/\d+K\sbytes\sof\smemory.", configuration)
             if match:
                 return match.group(1).strip()
             else:
-                match = re.search("\s+cisco Nexus9000 (.*) Chassis", configuration)
+                match = re.search(r"\s+cisco Nexus9000 (.*) Chassis", configuration)
                 if match:
                     return "N9K-"+match.group(1).strip()
                 else:
-                    match = re.search("ROM: Bootstrap program is Linux", configuration)
+                    match = re.search(r"ROM: Bootstrap program is Linux", configuration)
                     if match:
                         return "Cisco IOS vRouter "
                     else:
-                        match = re.search("Arista vEOS", configuration)
+                        match = re.search(r"Arista vEOS", configuration)
                         if match:
                             return "Arista vEOS"
                         else:
-                            match = re.search("Arista (\S+)", configuration)
+                            match = re.search(r"Arista (\S+)", configuration)
                             if match:
                                 return match.group(1).strip()
                             else:
                                 return "Not_found"
 
     if vendor == 'huawei':
-        match = re.search('(Quidway|HUAWEI)\s(\S+)\s+Routing\sSwitch\S*', configuration)
+        match = re.search(r'(Quidway|HUAWEI)\s(\S+)\s+Routing\sSwitch\S*', configuration)
         if match:
             return 'Huawei ' +match.group(2).strip()
         else:
-            match = re.search('HUAWEI\sCE(\S+)\s+uptime\S*', configuration)
+            match = re.search(r'HUAWEI\sCE(\S+)\s+uptime\S*', configuration)
             if match:
                 return 'Huawei CE' + match.group(1).strip()
             else:
-                match = re.search('Huawei\s(\S+)\s+Router\s\S*', configuration)
+                match = re.search(r'Huawei\s(\S+)\s+Router\s\S*', configuration)
                 if match:
                     return 'Huawei ' + match.group(1).strip()
                 else:
                     return "Not_found"
 
     if vendor == 'aruba':
-        match = re.search('Build\sID\s+: (\S-\S).*', configuration)
+        match = re.search(r'Build\sID\s+: (\S-\S).*', configuration)
         if match:
             return match.group(1).strip()
         else:
-            match = re.search('\s*Product\sSKU\s*:\s(\S*)', configuration)
+            match = re.search(r'\s*Product\sSKU\s*:\s(\S*)', configuration)
             if match:
                 return match.group(1).strip()
             else:
                 return "Not_found"
 
     if vendor == 'edgecore':
-        match = re.search('\s*HwSKU:\s(\S*)', configuration)
+        match = re.search(r'\s*HwSKU:\s(\S*)', configuration)
         if match:
             return match.group(1).strip()
         else:
             return "Not_found"
 
     if vendor == 'rdp':
-        match = re.search('\s+product-name\s+(\S+)', configuration)
+        match = re.search(r'\s+product-name\s+(\S+)', configuration)
         if match:
             return match.group(1).strip()
         else:
@@ -201,20 +206,16 @@ def obtain_software_version(configuration, family):
     Extract software version
     """
 
-    if family == 'IOS XE':
-        match = re.search("Cisco .+ Version ([0-9.()A-Za-z]+)", configuration)
-        if match:
-            return match.group(1).strip()
-    elif family == 'IOS':
+    if family == 'IOS XE' or family == 'IOS':
         match = re.search("Cisco .+ Version ([0-9.()A-Za-z]+)", configuration)
         if match:
             return match.group(1).strip()
     elif family == 'NX-OS':
-        match = re.search("\s*NXOS: version (.*)", configuration)
+        match = re.search(r"\s*NXOS: version (.*)", configuration)
         if match:
             return match.group(1).strip()
         else:
-            match = re.search("\s*system:\s+version\s*(.*)", configuration)
+            match = re.search(r"\s*system:\s+version\s*(.*)", configuration)
             if match:
                 return match.group(1).strip()
     elif family == 'EOS':
@@ -222,19 +223,19 @@ def obtain_software_version(configuration, family):
         if match:
             return match.group(1).strip()
     elif family == 'VRP':
-        match = re.search("VRP \(R\) software, Version (.*)", configuration)
+        match = re.search(r"VRP \(R\) software, Version (.*)", configuration)
         if match:
             return match.group(1).strip()
     elif family == 'ARUBA AOS-S':
-        match = re.search("\s*Software revision\s*:\s*(\S+)", configuration)
+        match = re.search(r"\s*Software revision\s*:\s*(\S+)", configuration)
         if match:
             return match.group(1).strip()
     elif family == 'Edgecore SONIC':
-        match = re.search("\s*SONiC Software Version:\s*(\S+)", configuration)
+        match = re.search(r"\s*SONiC Software Version:\s*(\S+)", configuration)
         if match:
             return match.group(1).strip()
     elif family == 'RDP EcoNPB':
-        match = re.search("\s+serial-number\s(\S+)", configuration)
+        match = re.search(r"\s+serial-number\s(\S+)", configuration)
         if match:
             return match.group(1).strip()
     else:
@@ -258,15 +259,11 @@ def obtain_software_family(configuration):
         return "VRP"
     elif re.search("ArubaOS", configuration):
         return "ARUBAOS"
-    elif re.search("\s*Software revision\s*:\s*(\S+)", configuration):
+    elif re.search(r"\s*Software revision\s*:\s*(\S+)", configuration):
         return "ARUBA AOS-S"
-    elif re.search("\s*SONiC Software Version:\s*(\S+)", configuration):
+    elif re.search(r"\s*SONiC Software Version:\s*(\S+)", configuration):
         return "Edgecore SONIC"
-    elif re.search("\s*FlowBalancer\s*(\S+)", configuration):
-        return "RDP EcoNPB"
-    elif re.search("\s*SDNSwitch-packet-broker\s*(\S+)", configuration):
-        return "RDP EcoNPB"
-    elif re.search("\s*EcoNPB\s*(\S+)", configuration):
+    elif re.search(r"\s*FlowBalancer\s*(\S+)", configuration) or re.search(r"\s*SDNSwitch-packet-broker\s*(\S+)", configuration) or re.search(r"\s*EcoNPB\s*(\S+)", configuration):
         return "RDP EcoNPB"
     else:
         return "unknown_platform"
@@ -293,7 +290,7 @@ def assign_platform(dev_family):
         platform = family_to_platform[dev_family]
     except KeyError:
         # можно также присвоить значение по умолчанию вместо бросания исключения
-        sendlog(cnf_save_path, "No suitable platform for device family {}".format(dev_family))
+        sendlog(cnf_save_path, f"No suitable platform for device family {dev_family}")
 #        raise ValueError('Undefined unit: {}'.format(e.args[0]))
         platform = ""
     return platform
@@ -303,18 +300,19 @@ def get_devices_from_file(file):
     devices = []
     hostnames = []
     with open(file) as f:
-        for line in f.readlines():
+        for line in f:
             if line.startswith('#'):
                 continue
 
-            if line == ['\n'] or line == [' \n'] or line == ['']:
+            if line == ['\n'] or line == [' \n'] or line == [''] or line == [" "]:
+                print('Error - empty line in devices file - skipping...')
                 continue
 
             device_string = line.split(";")
 
             if len(device_string) < 2:
-                print('Error - wrong devices file format')
-                return [], []
+                print('Error - wrong line in devices file - skipping...')
+                continue
 
             if len(device_string) > 2:
                 if not "".join(device_string[2:3]) == "":
@@ -406,7 +404,7 @@ def get_devices_from_file(file):
 def get_commands_from_file(file):
     commands = []
     with open(file) as f:
-        for line in f.readlines():
+        for line in f:
             if line.find('#') == -1:
                 commands.append(line.strip('\n'))
     return commands
@@ -446,7 +444,7 @@ def get_show_version(ip, login, passw):
         "auth_password": passw,
         "auth_strict_key": False,
         "ssh_config_file": True,
-        "transport": "ssh2"
+        "transport": TRANSPORT
     }
 
     vendor = 'cisco'

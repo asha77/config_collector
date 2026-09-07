@@ -1,8 +1,9 @@
-scrapli~=2026.2.20
+scrapli>=2026.02.20
 python-decouple~=3.8
+scrapli_community @ git+https://github.com/asha77/scrapli_community.git
+ssh2-python
 scrapli[ssh2]
 scrapli[paramiko]
-scrapli[community]
 pip
 setuptools~=82.0.0
 wheel>=0.46.2
