@@ -1,4 +1,7 @@
 /.env
+/.env*
+.vscode/launch.json
+.vscode/settings.json
 output
 **/output
 **/configs
@@ -8,4 +11,3 @@ output
 /devices.txt
 /commands.txt
 /devices_*.txt
-.idea/
