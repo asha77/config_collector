@@ -4,6 +4,7 @@ import gc
 import os
 import re
 import shutil
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -103,32 +104,40 @@ obfuscations = {
     r"\s*ssh user\s([a-zA-Z0-9_.-]+)(.*)": r" ssh user XXX YYY"
 }
 
-# block writing into common log for correct multithreadind writing into one log file
+# block writing into common log for correct multi threading writing into one log file
 _log_lock = threading.Lock()
 
 
+_LOG_TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S"
+
+
 def send_log(path, message):
+    """Запись сообщения в общий журнал и вывод в терминал (thread-safe)."""
+    timestamp = datetime.now().strftime(_LOG_TIMESTAMP_FMT)
+    log_line = f"{timestamp} YAUCC  INFO: {message}\n"
+
     with _log_lock:
-        file_name = os.path.join(path, 'logfile.log')
-        resfile = open(file_name, 'a', encoding='utf-8')
-        resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " YAUCC  INFO: " + message + "\n")
-        resfile.close()
-        print(str(datetime.now()) + " YAUCC INFO: " + message.strip('\n'))
+        try:
+            with open(os.path.join(path, 'logfile.log'), 'a', encoding='utf-8') as log_file:
+                log_file.write(log_line)
+        except OSError as exc:
+            print(f"[send_log] Ошибка записи в logfile.log: {exc}")
+            return False
+
+    print(f"{timestamp} YAUCC INFO: {message.strip(chr(10))}")
     return True
 
 
 def saveoutfile(path, ip, message):
     file_name = os.path.join(path, ip)
-    resfile = open(file_name, "a", encoding='utf-8')
-    resfile.write(message)
-    resfile.close()
+    with open(file_name, "a", encoding='utf-8') as out_file:
+        out_file.write(message)
 
 
 def rewrite_out_file(path, ip, message):
     file_name = os.path.join(path, ip)
-    resfile = open(file_name, "w", encoding='utf-8')
-    resfile.write(message)
-    resfile.close()
+    with open(file_name, "w", encoding='utf-8') as out_file:
+        out_file.write(message)
 
 
 def create_parser():
@@ -321,7 +330,7 @@ def parse_device_line(line):
         return None
 
     if len(device_string) > 2:
-        if not "".join(device_string[2:3]) == "":
+        if "".join(device_string[2:3]) != "":
             uname = "".join(device_string[2:3])
         else:
             uname = AUTH_USERNAME
@@ -329,7 +338,7 @@ def parse_device_line(line):
         uname = AUTH_USERNAME
 
     if len(device_string) > 3:
-        if not "".join(device_string[3:4]) == "":
+        if "".join(device_string[3:4]) != "":
             passw = "".join(device_string[3:4])
         else:
             passw = AUTH_PASSWORD
@@ -337,7 +346,7 @@ def parse_device_line(line):
         passw = AUTH_PASSWORD
 
     if len(device_string) > 4:
-        if not "".join(device_string[4:5]) == "":
+        if "".join(device_string[4:5]) != "":
             ena_pass = "".join(device_string[4:5])
         else:
             ena_pass = AUTH_SECONDARY
@@ -559,6 +568,8 @@ def get_show_version(ip, login, passw):
                 response1 = conn.send_command("show hardware-info platform-info", strip_prompt=False)
                 response.result = response.result + '\n' + response1.result
 
+        return vendor, response.result, strip_characters_from_prompt(hname)
+
     except ScrapliAuthenticationFailed as error:
         send_log(cnf_save_path, "IP: " + ip + " Authentication Error " +str(error) + " - please, check username, password and driver.")
         return '', '', ''
@@ -567,19 +578,8 @@ def get_show_version(ip, login, passw):
         return '', '', ''
     except ScrapliException as error:
         send_log(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
-        if hasattr(response, 'result'):
-            if (not response.result == '') and (not hname == ''):
-                return vendor, response.result, strip_characters_from_prompt(hname)
-            else:
-                return '', '', ''
-        else:
-            return '', '', ''
-    finally:
-        if hasattr(response, 'result'):
-            if (not response.result == '') and (not hname == ''):
-                return vendor, response.result, strip_characters_from_prompt(hname)
-            else:
-                return '', '', ''
+        if hasattr(response, 'result') and response.result != '' and hname != '':
+            return vendor, response.result, strip_characters_from_prompt(hname)
         else:
             return '', '', ''
 
@@ -625,11 +625,10 @@ def output_config_files_filter(input_line):
         match = re.search("Building configuration...", line)
         if not match:
             match = re.search("Current configuration:", line)
-            if not match:
-                if not line == '':
-                    match = re.search("end", line)
-                    if not match:
-                        lines_out.append(line)
+            if not match and line != '':
+                match = re.search("end", line)
+                if not match:
+                    lines_out.append(line)
 
     if lines_out[0:1] == '!':
         # noinspection PyTypeChecker
@@ -663,7 +662,7 @@ def delete_old_backups(target_directory, days_old):
                 elif item.is_dir():
                     shutil.rmtree(item)
                     print(f"Folder deleted: {item}")
-            except Exception as e:
+            except OSError as e:
                 print(f"Error during file deletion {item}: {e}")
 
 
@@ -681,7 +680,7 @@ def _describe_scrapli_error(error, device, stage, cnf_path):
     cur = error
     depth = 0
     while cur is not None and depth < 5:
-        causes.append("{}: {}".format(type(cur).__name__, str(cur)))
+        causes.append(f"{type(cur).__name__}: {cur!s}")
         cur = getattr(cur, '__cause__', None) or getattr(cur, '__context__', None)
         depth += 1
     cause_chain = " | ".join(causes) if causes else "(no cause)"
@@ -689,8 +688,8 @@ def _describe_scrapli_error(error, device, stage, cnf_path):
     send_log(cnf_path, "[DIAG] stage={} host={} platform={} transport={} timeout_socket={} timeout_transport={}".format(
         stage, device.get('host'), device.get('platform'), device.get('transport'),
         device.get('timeout_socket'), device.get('timeout_transport')))
-    send_log(cnf_path, "[DIAG] exception type={} msg={!r}".format(exc_type, exc_msg))
-    send_log(cnf_path, "[DIAG] cause chain: {}".format(cause_chain))
+    send_log(cnf_path, f"[DIAG] exception type={exc_type} msg={exc_msg!r}")
+    send_log(cnf_path, f"[DIAG] cause chain: {cause_chain}")
 
     # if Error is "connection not open", check it was lost before sending command 
     # or during command execution
@@ -719,19 +718,17 @@ def collect_device_data(device, commands, overwrite, date, cnf_path, hostnames):
             if overwrite:
                 rewrite_out_file(cnf_path, out_name, "Data collected: " + date + "\n")
 
-            cmd_index = 0
             total_cmds = len(commands)
-            for command in commands:
-                cmd_index += 1
+            for cmd_index, command in enumerate(commands, start=1):
                 if __debug__:
-                    send_log(cnf_path, device['host'] + " send command [{} of {}]: {}".format(cmd_index, total_cmds, command))
+                    send_log(cnf_path, f"{device['host']} send command [{cmd_index} of {total_cmds}]: {command}")
 
                 time.sleep(0.2)
                 # each command has its own try to understand where connection may be lost
                 try:
                     reply = ssh.send_command(command, timeout_ops=TIMEOUT_OPS)
                 except ScrapliException as cmd_err:
-                    _describe_scrapli_error(cmd_err, device, "command #{}/{} ({})".format(cmd_index, total_cmds, command), cnf_path)
+                    _describe_scrapli_error(cmd_err, device, f"command #{cmd_index}/{total_cmds} ({command})", cnf_path)
                     raise
                 time.sleep(0.8)
 
@@ -745,11 +742,11 @@ def collect_device_data(device, commands, overwrite, date, cnf_path, hostnames):
                         ln = len(filtered_result)
                         if ln > 20:
                             ln = 20
-                            send_log(cnf_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' received: ' + filtered_result[0:ln-1].replace('\n', ' ') + ' ...')
+                            send_log(cnf_path, f"{device['host']} elapsed time: {reply.elapsed_time} received: {filtered_result[0:ln-1].replace(chr(10), ' ')} ...")
 
-                    saveoutfile(cnf_path, out_name, "\n" + "# " + command +"\n" + filtered_result + "\n")
+                    saveoutfile(cnf_path, out_name, f"\n# {command}\n{filtered_result}\n")
                 else:
-                    send_log(cnf_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' send: ' + command + ' - nothing received!')
+                    send_log(cnf_path, f"{device['host']} elapsed time: {reply.elapsed_time} send: {command} - nothing received!")
 
                 # del reply to free memory
                 del reply
@@ -779,7 +776,7 @@ def collect_device_backup(device, hostnames, backups_path_now):
         try:
             return ssh.send_command(command, timeout_ops=TIMEOUT_OPS)
         except ScrapliException as cmd_err:
-            _describe_scrapli_error(cmd_err, device, "backup command ({})".format(command), cnf_save_path)
+            _describe_scrapli_error(cmd_err, device, f"backup command ({command})", cnf_save_path)
             raise
 
     try:
@@ -842,12 +839,11 @@ def start():
 
     # number of parallel connections: CLI argument or MAX_WORKERS parameter in .env
     max_workers = namespace.workers if namespace.workers else MAX_WORKERS
-    if max_workers < 1:
-        max_workers = 1
+    max_workers = max(max_workers, 1)
 
     # recording of scrapli debug log into file switched on using SCRAPLI_DEBUG_LOG parameter in .env;
     # by default debug log is switched off, because common log processor from all threads 
-    # consume memoty during parallel work
+    # consume memory during parallel work
     if SCRAPLI_DEBUG_LOG:
         enable_basic_logging(file="scrapli.log", level="debug")
     else:
@@ -855,7 +851,7 @@ def start():
 
     if namespace.devices is None:
         print("Path to file with list of devices required! Key: -d <path>")
-        exit()
+        sys.exit()
 
     if namespace.commands is not None:
         print("          ... path to file with commands specified")
@@ -926,7 +922,6 @@ def start():
     devices, hostnames = get_devices_from_file(os.path.join(curr_path, namespace.devices), max_workers)
 
     send_log(cnf_save_path, str(len(devices)) + " devices loaded")
-#    sendlog(cnf_save_path, str(len(commands)) + " commands loaded")
 
     # connect to devices - collecting data from devices in parallel
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
