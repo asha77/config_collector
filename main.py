@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import argparse
+import gc
 import os
 import re
 import shutil
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -14,6 +17,7 @@ from scrapli.exceptions import (
     ScrapliAuthenticationFailed,
     ScrapliConnectionNotOpened,
     ScrapliException,
+    ScrapliTimeout,
 )
 
 # import logging
@@ -32,6 +36,8 @@ else:
 TRANSPORT = config('TRANSPORT')
 TIMEOUT_SOCKET = config('TIMEOUT_SOCKET')
 TIMEOUT_TRANSPORT = config('TIMEOUT_TRANSPORT')
+# timeout for one command processing 60s by default may be increased in case of log downloading
+TIMEOUT_OPS = int(config('TIMEOUT_OPS', default='60'))
 WORKING_DIRECTORY = config('WORKING_DIRECTORY')
 BACKUP_CONFIG_FOLDER = config('BACKUP_CONFIG_FOLDER')
 try:
@@ -40,6 +46,11 @@ except UndefinedValueError:
     print("          ... it seems that no \"OUTPUT_FOLDER\" parameter specified in .env file - using by-default values...")
     OUTPUT_FOLDER = 'output'
 
+# количество одновременных подключений к устройствам при сборе данных
+MAX_WORKERS = int(config('MAX_WORKERS', default='10'))
+
+# switch on scrapli debug logging into a file (switched off by default)
+SCRAPLI_DEBUG_LOG = config('SCRAPLI_DEBUG_LOG', default='False') == 'True'
 
 family_to_platform = {
     'IOS': 'cisco_iosxe',
@@ -92,13 +103,17 @@ obfuscations = {
     r"\s*ssh user\s([a-zA-Z0-9_.-]+)(.*)": r" ssh user XXX YYY"
 }
 
+# block writing into common log for correct multithreadind writing into one log file
+_log_lock = threading.Lock()
 
-def sendlog(path, message):
-    file_name = os.path.join(path, 'logfile.log')
-    resfile = open(file_name, 'a', encoding='utf-8')
-    resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " YAUCC  INFO: " + message + "\n")
-    resfile.close()
-    print(str(datetime.now()) + " YAUCC INFO: " + message.strip('\n'))
+
+def send_log(path, message):
+    with _log_lock:
+        file_name = os.path.join(path, 'logfile.log')
+        resfile = open(file_name, 'a', encoding='utf-8')
+        resfile.write(str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + " YAUCC  INFO: " + message + "\n")
+        resfile.close()
+        print(str(datetime.now()) + " YAUCC INFO: " + message.strip('\n'))
     return True
 
 
@@ -120,8 +135,9 @@ def create_parser():
     parser = argparse.ArgumentParser(prog='YAUCC - Yet Another Universal Config Collector', description='Python app for executing commands on network equipment using SSH', epilog='author: asha77@gmail.com')
     parser.add_argument('-d', '--devfile', dest="devices", required=True, help='Path to file with list of devices')
     parser.add_argument('-c', '--comfiles', dest="commands",  required=False, help='Path to file with Commands to be executed on devices (cancels autodetection of command set according to device platform)')
-    parser.add_argument('-o', '--overwrite', required=False, action='store_true', help='Save and overwrite files into the same folder e.g. \"output\" folder')
-    parser.add_argument('-b', '--backup_configs', nargs='?', type=int, const=1, default=0, required=False, help='Save config backup files into \"BACKUP_CONFIG_FOLDER\" once or days to keep backups')
+    parser.add_argument('-o', '--overwrite', required=False, action='store_true', help='Save and overwrite files into the same folder e.g. "output" folder')
+    parser.add_argument('-b', '--backup_configs', nargs='?', type=int, const=1, default=0, required=False, help='Save config backup files into "BACKUP_CONFIG_FOLDER" once or days to keep backups')
+    parser.add_argument('-w', '--workers', type=int, default=None, required=False, help='Number of parallel connections to devices (overrides MAX_WORKERS from .env)')
     return parser
 
 
@@ -289,16 +305,122 @@ def assign_platform(dev_family):
     try:
         platform = family_to_platform[dev_family]
     except KeyError:
-        # можно также присвоить значение по умолчанию вместо бросания исключения
-        sendlog(cnf_save_path, f"No suitable platform for device family {dev_family}")
-#        raise ValueError('Undefined unit: {}'.format(e.args[0]))
+        send_log(cnf_save_path, f"No suitable platform for device family {dev_family}")
         platform = ""
     return platform
 
 
-def get_devices_from_file(file):
-    devices = []
-    hostnames = []
+def parse_device_line(line):
+    """
+    Split device line on connection parameters
+    """
+    device_string = line.split(";")
+
+    if len(device_string) < 2:
+        print('Error - wrong line in devices file - skipping...')
+        return None
+
+    if len(device_string) > 2:
+        if not "".join(device_string[2:3]) == "":
+            uname = "".join(device_string[2:3])
+        else:
+            uname = AUTH_USERNAME
+    else:
+        uname = AUTH_USERNAME
+
+    if len(device_string) > 3:
+        if not "".join(device_string[3:4]) == "":
+            passw = "".join(device_string[3:4])
+        else:
+            passw = AUTH_PASSWORD
+    else:
+        passw = AUTH_PASSWORD
+
+    if len(device_string) > 4:
+        if not "".join(device_string[4:5]) == "":
+            ena_pass = "".join(device_string[4:5])
+        else:
+            ena_pass = AUTH_SECONDARY
+    else:
+        ena_pass = AUTH_SECONDARY
+
+    return {
+        'ip': "".join(device_string[1:2]),
+        'auth_username': uname,
+        'auth_password': passw,
+        'auth_secondary': ena_pass,
+        'specified_platform': "".join(device_string[0:1])
+    }
+
+
+def process_device_record(record, chlog):
+    """
+    Finding device model, software family and platform for device (in separate thread)
+    """
+    ip = record['ip']
+    uname = record['auth_username']
+    passw = record['auth_password']
+
+    vendor, show_ver, hname = get_show_version(ip, uname, passw)
+
+    if (show_ver == '') and (hname == ''):
+        return None
+
+    if __debug__:
+        send_log(cnf_save_path, "show version:\n " + show_ver)
+
+    device_model = obtain_model(vendor, show_ver)
+
+    if __debug__:
+        send_log(cnf_save_path, "Device model:\n " + device_model)
+
+    device_family = obtain_software_family(show_ver)
+    device_soft_ver = obtain_software_version(show_ver, device_family)
+
+    if __debug__:
+        send_log(cnf_save_path, "Device software:\n " + device_soft_ver)
+        send_log(cnf_save_path, "Device family:\n " + device_family)
+
+    if record['specified_platform']:
+        device_platform = record['specified_platform']
+    else:
+        device_platform = assign_platform(device_family)
+
+    if device_platform:
+        send_log(cnf_save_path, "IP: " + ip + ". Device model is: " + device_model + ". Software version is: " + device_soft_ver + ". Selected platform: " + device_platform)
+    else:
+        send_log(cnf_save_path, "IP: " + ip + " Device and platform not recognized.")
+        if show_ver:
+            saveoutfile(cnf_save_path, str(ip) + '_' + hname + '.log', "\n" + show_ver)
+        return None
+
+    dev = {
+        'platform': device_platform,
+        'host': ip,
+        'auth_username': uname,
+        'auth_password': passw,
+        'auth_secondary': record['auth_secondary'],
+        'channel_log': chlog,
+        "auth_strict_key": AUTH_STRICT_KEY,
+        "ssh_config_file": True,
+        "transport": TRANSPORT,
+        "timeout_socket": int(TIMEOUT_SOCKET),          # timeout for establishing socket/initial connection in seconds
+        "timeout_transport": int(TIMEOUT_TRANSPORT)    # timeout for ssh|telnet transport in seconds
+    }
+
+    hn = {
+        "hostname": hname,
+        "ip": ip
+    }
+
+    return dev, hn
+
+
+def get_devices_from_file(file, max_workers):
+    """
+    Loading list of devices and their parameters
+    """
+    records = []
     with open(file) as f:
         for line in f:
             if line.startswith('#'):
@@ -308,94 +430,29 @@ def get_devices_from_file(file):
                 print('Error - empty line in devices file - skipping...')
                 continue
 
-            device_string = line.split(";")
-
-            if len(device_string) < 2:
-                print('Error - wrong line in devices file - skipping...')
+            record = parse_device_line(line)
+            if record is None:
                 continue
 
-            if len(device_string) > 2:
-                if not "".join(device_string[2:3]) == "":
-                    uname = "".join(device_string[2:3])
-                else:
-                    uname = AUTH_USERNAME
-            else:
-                uname = AUTH_USERNAME
+            records.append(record)
 
-            if len(device_string) > 3:
-                if not "".join(device_string[3:4]) == "":
-                    passw = "".join(device_string[3:4])
-                else:
-                    passw = AUTH_PASSWORD
-            else:
-                passw = AUTH_PASSWORD
+    devices = []
+    hostnames = []
 
-            if len(device_string) > 4:
-                if not "".join(device_string[4:5]) == "":
-                    ena_pass = "".join(device_string[4:5])
-                else:
-                    ena_pass = AUTH_SECONDARY
-            else:
-                ena_pass = AUTH_SECONDARY
+    if __debug__:
+        chlog = True
+    else:
+        chlog = False
 
-            vendor, show_ver, hname = get_show_version("".join(device_string[1:2]), uname, passw)
-
-            if (show_ver == '') and (hname == ''):
+    # Finding different device parameters executing in different threads
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(process_device_record, record, chlog): record for record in records}
+        for future in as_completed(futures):
+            result = future.result()
+            if result is None:
                 continue
-
-            if __debug__:
-                sendlog(cnf_save_path, "show version:\n " + show_ver)
-
-            device_model = obtain_model(vendor, show_ver)
-
-            if __debug__:
-                sendlog(cnf_save_path, "Device model:\n " + device_model)
-
-            device_family = obtain_software_family(show_ver)
-            device_soft_ver = obtain_software_version(show_ver, device_family)
-
-            if __debug__:
-                sendlog(cnf_save_path, "Device software:\n " + device_soft_ver)
-                sendlog(cnf_save_path, "Device family:\n " + device_family)
-
-            if "".join(device_string[0:1]):
-                device_platform = "".join(device_string[0:1])
-            else:
-                device_platform = assign_platform(device_family)
-
-            if device_platform:
-                sendlog(cnf_save_path, "IP: " + "".join(device_string[1:2]) + ". Device model is: " + device_model + ". Software version is: " + device_soft_ver + ". Selected platform: " + device_platform)
-            else:
-                sendlog(cnf_save_path, "IP: " + "".join(device_string[1:2]) + " Device and platform not recognized.")
-                if show_ver:
-                    saveoutfile(cnf_save_path, str(device_string[1:2]) + '_' + hname + '.log', "\n" + show_ver)
-                continue
-
-            if __debug__:
-                chlog = True
-            else:
-                chlog = False
-
-            dev = {
-                'platform': device_platform,
-                'host': "".join(device_string[1:2]),
-                'auth_username': uname,
-                'auth_password': passw,
-                'auth_secondary': ena_pass,
-                'channel_log': chlog,
-                "auth_strict_key": AUTH_STRICT_KEY,
-                "ssh_config_file": True,
-                "transport": TRANSPORT,
-                "timeout_socket": int(TIMEOUT_SOCKET),          # timeout for establishing socket/initial connection in seconds
-                "timeout_transport": int(TIMEOUT_TRANSPORT)    # timeout for ssh|telnet transport in seconds
-            }
+            dev, hn = result
             devices.append(dev)
-
-            hn = {
-                "hostname": hname,
-                "ip": "".join(device_string[1:2])
-            }
-
             hostnames.append(hn)
 
     return devices, hostnames
@@ -408,6 +465,7 @@ def get_commands_from_file(file):
             if line.find('#') == -1:
                 commands.append(line.strip('\n'))
     return commands
+
 
 '''
 def send_show(device, show_command):
@@ -477,7 +535,7 @@ def get_show_version(ip, login, passw):
                 vendor = 'rdp'
 
             if __debug__:
-                sendlog(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response.result)
+                send_log(cnf_save_path, "IP: " + ip + " INFO " + "Response: " + response.result)
 
             time.sleep(0.5)
 
@@ -502,13 +560,13 @@ def get_show_version(ip, login, passw):
                 response.result = response.result + '\n' + response1.result
 
     except ScrapliAuthenticationFailed as error:
-        sendlog(cnf_save_path, "IP: " + ip + " Authentication Error " +str(error) + " - please, check username, password and driver.")
+        send_log(cnf_save_path, "IP: " + ip + " Authentication Error " +str(error) + " - please, check username, password and driver.")
         return '', '', ''
     except ScrapliConnectionNotOpened as error:
-        sendlog(cnf_save_path, "IP: " + ip + " Connection Error " +str(error) + " - please, check device exist or online.")
+        send_log(cnf_save_path, "IP: " + ip + " Connection Error " +str(error) + " - please, check device exist or online.")
         return '', '', ''
     except ScrapliException as error:
-        sendlog(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
+        send_log(cnf_save_path, "IP: " + ip + " Scrapli Error " + str(error))
         if hasattr(response, 'result'):
             if (not response.result == '') and (not hname == ''):
                 return vendor, response.result, strip_characters_from_prompt(hname)
@@ -609,6 +667,171 @@ def delete_old_backups(target_directory, days_old):
                 print(f"Error during file deletion {item}: {e}")
 
 
+def _describe_scrapli_error(error, device, stage, cnf_path):
+    """
+    Diagnose scrapli error: writing into log exception type, cause, state of transport 
+    to troubleshoot root case and point of error
+    """
+    exc_type = type(error).__name__
+    exc_msg = str(error)
+
+    # collecting cause chain (original -> wrapped), because context manager 
+    # include original exception in new ScrapliConnectionError
+    causes = []
+    cur = error
+    depth = 0
+    while cur is not None and depth < 5:
+        causes.append("{}: {}".format(type(cur).__name__, str(cur)))
+        cur = getattr(cur, '__cause__', None) or getattr(cur, '__context__', None)
+        depth += 1
+    cause_chain = " | ".join(causes) if causes else "(no cause)"
+
+    send_log(cnf_path, "[DIAG] stage={} host={} platform={} transport={} timeout_socket={} timeout_transport={}".format(
+        stage, device.get('host'), device.get('platform'), device.get('transport'),
+        device.get('timeout_socket'), device.get('timeout_transport')))
+    send_log(cnf_path, "[DIAG] exception type={} msg={!r}".format(exc_type, exc_msg))
+    send_log(cnf_path, "[DIAG] cause chain: {}".format(cause_chain))
+
+    # if Error is "connection not open", check it was lost before sending command 
+    # or during command execution
+    if isinstance(error, ScrapliConnectionNotOpened):
+        send_log(cnf_path, "[DIAG] CONNECTION NOT OPENED at stage={} — соединение с устройством {} было потеряно".format(stage, device.get('host')))
+
+    # timeout for send/receive: device does not get input during TIMEOUT_OPS;
+    # it it not a connection close, but slow CLI or long operation — you need to to increase TIMEOUT_OPS in .env
+    if isinstance(error, ScrapliTimeout):
+        send_log(cnf_path, "[DIAG] TIMEOUT at stage={} host={} — устройство не приняло ввод за {} сек (TIMEOUT_OPS). Увеличьте TIMEOUT_OPS в .env, если это повторяется.".format(
+            stage, device.get('host'), TIMEOUT_OPS))
+
+
+def collect_device_data(device, commands, overwrite, date, cnf_path, hostnames):
+    """
+    Collecting data from one device: command execution and  saving results
+     executing in separate thread
+    """
+    dev_start_time = datetime.now()
+    hostname = get_hostname_by_ip(device['host'], hostnames)
+    out_name = device['host'] + "_" + hostname + '.log'
+
+    try:
+        with Scrapli(**device, timeout_ops=180) as ssh:
+
+            if overwrite:
+                rewrite_out_file(cnf_path, out_name, "Data collected: " + date + "\n")
+
+            cmd_index = 0
+            total_cmds = len(commands)
+            for command in commands:
+                cmd_index += 1
+                if __debug__:
+                    send_log(cnf_path, device['host'] + " send command [{} of {}]: {}".format(cmd_index, total_cmds, command))
+
+                time.sleep(0.2)
+                # each command has its own try to understand where connection may be lost
+                try:
+                    reply = ssh.send_command(command, timeout_ops=TIMEOUT_OPS)
+                except ScrapliException as cmd_err:
+                    _describe_scrapli_error(cmd_err, device, "command #{}/{} ({})".format(cmd_index, total_cmds, command), cnf_path)
+                    raise
+                time.sleep(0.8)
+
+                if __debug__:
+                    send_log(cnf_path, reply.result[0:30].replace('\n', ' '))
+
+                if reply.result:
+                    filtered_result = thrash_string_filter(obfuscation_filter(reply.result))
+
+                    if __debug__:
+                        ln = len(filtered_result)
+                        if ln > 20:
+                            ln = 20
+                            send_log(cnf_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' received: ' + filtered_result[0:ln-1].replace('\n', ' ') + ' ...')
+
+                    saveoutfile(cnf_path, out_name, "\n" + "# " + command +"\n" + filtered_result + "\n")
+                else:
+                    send_log(cnf_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' send: ' + command + ' - nothing received!')
+
+                # del reply to free memory
+                del reply
+
+            # garbage collection to free memory from driver objects and replies between commands
+
+            gc.collect()
+    except ScrapliException as error:
+        _describe_scrapli_error(error, device, "outer handler", cnf_path)
+        print(error)
+        # free pointer on raised exception: its __cause__ and traceback
+        del error
+        gc.collect()
+    send_log(cnf_path, "Device {} processed in {}".format(device['host'], datetime.now() - dev_start_time))
+
+
+def collect_device_backup(device, hostnames, backups_path_now):
+    """
+    Collecting device configuration backup for one device 
+    executed in separate thread
+    """
+    def _backup_send(ssh, command):
+        """
+        Sending command with diagnostics: fixing command which cause connection lost
+        and state of exception
+        """
+        try:
+            return ssh.send_command(command, timeout_ops=TIMEOUT_OPS)
+        except ScrapliException as cmd_err:
+            _describe_scrapli_error(cmd_err, device, "backup command ({})".format(command), cnf_save_path)
+            raise
+
+    try:
+        with Scrapli(**device, timeout_ops=180) as ssh:
+            if device['platform'] == 'edgecore_sonic':
+                time.sleep(0.2)
+                reply = _backup_send(ssh, 'show runningconfiguration all')
+                time.sleep(0.2)
+
+                if __debug__:
+                    send_log(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                rewrite_out_file(backups_path_now, get_hostname_by_ip(device['host'], hostnames) + '_config_db.json', output_config_files_filter(reply.result))
+                del reply
+
+                time.sleep(0.2)
+                reply = _backup_send(ssh, 'show runningconfiguration bgp')
+                time.sleep(0.2)
+
+                if __debug__:
+                    send_log(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                rewrite_out_file(backups_path_now, get_hostname_by_ip(device['host'], hostnames) + '_frr.conf', output_config_files_filter(reply.result))
+                del reply
+            elif device['platform'] == 'huawei_vrp':
+                time.sleep(0.2)
+                reply = _backup_send(ssh, 'display current-configuration')
+                time.sleep(0.2)
+                if __debug__:
+                    send_log(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+                rewrite_out_file(backups_path_now, get_hostname_by_ip(device['host'], hostnames) + '_config.txt', output_config_files_filter(reply.result))
+                del reply
+            elif device['platform'] == 'rdp_econpb':
+                time.sleep(0.2)
+                reply = _backup_send(ssh, 'show | view set')
+                time.sleep(0.2)
+                if __debug__:
+                    send_log(cnf_save_path, reply.result[0:30].replace('\n', ' '))
+
+                rewrite_out_file(backups_path_now, 'RDP_' + device['host'] + '_config.txt', output_config_files_filter(reply.result))
+                del reply
+
+            # periodical garbage collection to free memory
+            gc.collect()
+    except ScrapliException as error:
+        _describe_scrapli_error(error, device, "backup outer handler", cnf_save_path)
+        print(error)
+        # free pointer on raised exception: its __cause__ and traceback
+        del error
+        gc.collect()
+
+
 def start():
     global curr_path
     global cnf_save_path
@@ -617,13 +840,18 @@ def start():
     namespace = parser.parse_args()
     comm_file_path_specified = False
 
-    if __debug__:
-        # enable_basic_logging(file=True, level="debug")
+    # number of parallel connections: CLI argument or MAX_WORKERS parameter in .env
+    max_workers = namespace.workers if namespace.workers else MAX_WORKERS
+    if max_workers < 1:
+        max_workers = 1
+
+    # recording of scrapli debug log into file switched on using SCRAPLI_DEBUG_LOG parameter in .env;
+    # by default debug log is switched off, because common log processor from all threads 
+    # consume memoty during parallel work
+    if SCRAPLI_DEBUG_LOG:
         enable_basic_logging(file="scrapli.log", level="debug")
-#        logging.basicConfig(file=True, filename="scrapli.log", level=logging.DEBUG)
     else:
         enable_basic_logging(file=False)
- #       logging.basicConfig(file=False, filename="scrapli.log", level=logging.INFO)
 
     if namespace.devices is None:
         print("Path to file with list of devices required! Key: -d <path>")
@@ -652,6 +880,8 @@ def start():
         print("          ... configuration backups not activated")
         save_backups = False
         days_backups = 0
+
+    print("          ... parallel connections per phase: " + str(max_workers))
 
     start_time = datetime.now()
     date = str(start_time.date()) + "-" + str(start_time.strftime("%H-%M-%S"))
@@ -688,59 +918,30 @@ def start():
         if not os.path.isdir(backups_save_path):
             os.mkdir(backups_save_path)
 
-    sendlog(cnf_save_path, "============ Acquisition section =================")
-    sendlog(cnf_save_path, "Starting at "+date)
-    sendlog(cnf_save_path, "Config save folder is: " + str(cnf_save_path))
+    send_log(cnf_save_path, "============ Acquisition section =================")
+    send_log(cnf_save_path, "Starting at "+date)
+    send_log(cnf_save_path, "Config save folder is: " + str(cnf_save_path))
 
     # Get list of available device files
-    devices, hostnames = get_devices_from_file(os.path.join(curr_path, namespace.devices))
+    devices, hostnames = get_devices_from_file(os.path.join(curr_path, namespace.devices), max_workers)
 
-    sendlog(cnf_save_path, str(len(devices)) + " devices loaded")
+    send_log(cnf_save_path, str(len(devices)) + " devices loaded")
 #    sendlog(cnf_save_path, str(len(commands)) + " commands loaded")
 
-    # connect to devices
-    for device in devices:
-        dev_start_time = datetime.now()
+    # connect to devices - collecting data from devices in parallel
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for device in devices:
+            if comm_file_path_specified:
+                commands = get_commands_from_file(os.path.join(curr_path, namespace.commands))
+            else:
+                commands = get_commands_from_file(os.path.join(curr_path, platform_to_commands[device['platform']]))
 
-        if comm_file_path_specified:
-            commands = get_commands_from_file(os.path.join(curr_path, namespace.commands))
-        else:
-            commands = get_commands_from_file(os.path.join(curr_path, platform_to_commands[device['platform']]))
-
-        sendlog(cnf_save_path, "============ Processing section =================")
-        sendlog(cnf_save_path, "Starting processing of device {}".format(device['host']))
-        try:
-            with Scrapli(**device, timeout_ops=180) as ssh:
-
-                if overwrite:
-                    rewrite_out_file(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames) + '.log', "Data collected: " + date + "\n")
-
-                for command in commands:
-                    if __debug__:
-                        sendlog(cnf_save_path, device['host'] + " send command: " + command)
-
-                    time.sleep(0.2)
-                    reply = ssh.send_command(command, timeout_ops=30)
-                    time.sleep(0.8)
-
-                    if __debug__:
-                        sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
-
-                    if reply.result:
-                        filtered_result = thrash_string_filter(obfuscation_filter(reply.result))
-
-                        if __debug__:
-                            ln = len(filtered_result)
-                            if ln > 20:
-                                ln = 20
-                                sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' received: ' + filtered_result[0:ln-1].replace('\n', ' ') + ' ...')
-
-                        saveoutfile(cnf_save_path, device['host'] + "_" + get_hostname_by_ip(device['host'], hostnames) + '.log', "\n" + "# " + command +"\n" + filtered_result + "\n")
-                    else:
-                        sendlog(cnf_save_path, device['host'] + " elapsed time: " + str(reply.elapsed_time) + ' send: ' + command + ' - nothing received!')
-        except ScrapliException as error:
-            print(error)
-        sendlog(cnf_save_path, "Device {} processed in {}".format(device['host'], datetime.now() - dev_start_time))
+            send_log(cnf_save_path, "============ Processing section =================")
+            send_log(cnf_save_path, "Starting processing of device {}".format(device['host']))
+            futures.append(executor.submit(collect_device_data, device, commands, overwrite, date, cnf_save_path, hostnames))
+        for future in as_completed(futures):
+            future.result()
 
     # collect configuration and save them into 'config' folder for backup
     if save_backups:
@@ -753,44 +954,13 @@ def start():
 
         os.chdir(backups_save_path_now)
         for device in devices:
-            sendlog(cnf_save_path, "Starting collection config backups from {}".format(device['host']))
-            try:
-                with Scrapli(**device, timeout_ops=180) as ssh:
-                    if device['platform'] == 'edgecore_sonic':
-                        time.sleep(0.2)
-                        reply = ssh.send_command('show runningconfiguration all')
-                        time.sleep(0.2)
+            send_log(cnf_save_path, "Starting collection config backups from {}".format(device['host']))
 
-                        if __debug__:
-                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
-
-                        rewrite_out_file(backups_save_path_now, get_hostname_by_ip(device['host'], hostnames) + '_config_db.json', output_config_files_filter(reply.result))
-
-                        time.sleep(0.2)
-                        reply = ssh.send_command('show runningconfiguration bgp')
-                        time.sleep(0.2)
-
-                        if __debug__:
-                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
-
-                        rewrite_out_file(backups_save_path_now, get_hostname_by_ip(device['host'], hostnames) + '_frr.conf', output_config_files_filter(reply.result))
-                    elif device['platform'] == 'huawei_vrp':
-                        time.sleep(0.2)
-                        reply = ssh.send_command('display current-configuration')
-                        time.sleep(0.2)
-                        if __debug__:
-                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
-                        rewrite_out_file(backups_save_path_now, get_hostname_by_ip(device['host'], hostnames) + '_config.txt', output_config_files_filter(reply.result))
-                    elif device['platform'] == 'rdp_econpb':
-                        time.sleep(0.2)
-                        reply = ssh.send_command('show | view set')
-                        time.sleep(0.2)
-                        if __debug__:
-                            sendlog(cnf_save_path, reply.result[0:30].replace('\n', ' '))
-
-                        rewrite_out_file(backups_save_path_now, 'RDP_' + device['host'] + '_config.txt', output_config_files_filter(reply.result))
-            except ScrapliException as error:
-                print(error)
+        # collecting backup configuration data data from devices doing in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(collect_device_backup, device, hostnames, backups_save_path_now) for device in devices]
+            for future in as_completed(futures):
+                future.result()
 
         delete_old_backups(backups_save_path, days_old=days_backups)
 

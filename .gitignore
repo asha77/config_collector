@@ -11,3 +11,4 @@ output
 /devices.txt
 /commands.txt
 /devices_*.txt
+/__pycache__
