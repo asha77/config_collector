@@ -1,9 +1,11 @@
 # YAUCC - Yet Another Universal Config Collector 
-This python 3.7 - 3.9 app be used for network survey, or any other operation or maintenance tasks. Tested with 3.9 version.  
+This Python app tested be used for network survey, or any other operation or maintenance tasks. 
+Latest version tested with python 3.13.5.
 
 It can:
 - connect using SSHv2 to number of network devices
 - execute series of show commands on network  devices 
+- collect backups from some types of devices
 - write output of executed commands into files 
 
 ## WARNING!!! YAUCC not tested for configuration commands, but there are no any special restrictions for them.
@@ -18,12 +20,15 @@ It created based on Scrapli python library and support it's core platforms:
 - Juniper JunOS - juniper_junos
 - Edgecore Sonic - edgecore_sonic
 - ARUBA AOS-S - aruba_aoscx
+- RDP EcoNPB - rdp_econpb
 
-** More platforms from Scraply-community will be added later.
+** More platforms from Scraply-community can be added later.
+For Edgecore switches support fork of scrapli-community library with Edgecore support added in requirements.txt
 
-It use transport ssh2 -- scrapli wrapper around ssh2-python library. 
+Scrapli use transport ssh2 -- scrapli wrapper around ssh2-python library, but you can use paramiko instead (choose in .env)
+
 For using YACC you need:
-1. Install python 3.7+ (latest - best choice) and reqiured libraries.
+1. Install python 3.7+ (latest - best choice) and required libraries.
 2. Rename '.env_init' file into '.env' file and change environment variables in it - see below (file '.env' will remains locally).
 ```
 AUTH_USERNAME=<username>
@@ -31,13 +36,15 @@ AUTH_PASSWORD=<password>
 AUTH_SECONDARY=<enable password>
 AUTH_STRICT_KEY=False
 TRANSPORT=sshv2
-TIMEOUT_SOCKET=5
-TIMEOUT_TRANSPORT=10
+TIMEOUT_SOCKET=20
+TIMEOUT_TRANSPORT=20
+TIMEOUT_OPS=360
 WORKING_DIRECTORY=
+MAX_WORKERS=10
+SCRAPLI_DEBUG_LOG=False
 BACKUP_CONFIG_FOLDER='Path to store backups'
 OUTPUT_FOLDER='Path to store collected data' # if parameter will be absent or qual '', data will be saved into 'output' directory under script working directory (by default)
 ```
-
 Any spaces, tabs, and so on after '=' MUST be absent. 
 
 3. Put actual devices information into 'devices.txt' file (see below).
@@ -64,7 +71,10 @@ File names, extension and location can be any - it is passed as CLI value.
 
 ## Options
     -d or --devfile [ file_with_list_of_devices ]   - path to file with list of network network devices 
-    -o or --overwrite                               - save results into 'output' folder rewriting previous results each time 
+    -c or --comfiles [ file_with_list_of_commands ] - path to file with commands to be executed on devices (this cancels autodetection of command set according to device platform
+    -o or --overwrite                               - Save and overwrite files into the same folder e.g. "output" folder
+    -b or --backup_configs                          - Save config backup files into "BACKUP_CONFIG_FOLDER" once or days to keep backups
+    -w or --workers                                 - Number of parallel connections to devices (overrides MAX_WORKERS from .env)
 
 Script provided with set of files with lists of 'show' commands for supported platforms. These commands should be executed on each device. 
 These lists are excessive (not all commands are relevant for any device) and can produce errors in log. 
